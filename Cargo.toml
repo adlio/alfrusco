@@ -2,6 +2,7 @@
 name = "alfrusco"
 version = "0.1.0"
 edition = "2021"
+description = "Utilities for building Alfred workflows with Rust."
 licesne = "MIT"
 
 [dependencies]
