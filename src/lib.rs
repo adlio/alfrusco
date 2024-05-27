@@ -2,6 +2,7 @@ mod cache;
 mod clipboard;
 pub mod config;
 mod data;
+mod error;
 mod item;
 mod response;
 
@@ -10,6 +11,7 @@ pub use response::Response;
 
 pub use cache::cache_dir;
 pub use data::data_dir;
+pub use error::{Error, Result};
 
 pub use clipboard::copy_markdown_link_to_clipboard;
 pub use clipboard::copy_rich_text_link_to_clipboard;

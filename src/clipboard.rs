@@ -49,7 +49,7 @@ pub fn handle_clipboard() {
 }
 
 pub fn write_empty_items() -> Result<()> {
-    Response::with_items(vec![])
+    Response::new_with_items(vec![])
         .write(std::io::stdout())
         .unwrap();
     Ok(())
