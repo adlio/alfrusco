@@ -4,4 +4,4 @@ test:
 	cargo test
 
 coverage:
-	cargo tarpaulin --exclude-files tests/* --out Htmlmake 
+	cargo tarpaulin --exclude-files tests/* --out Html
