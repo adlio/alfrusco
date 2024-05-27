@@ -3,7 +3,7 @@ name = "alfrusco"
 version = "0.1.0"
 edition = "2021"
 description = "Utilities for building Alfred workflows with Rust."
-licensee = "MIT"
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0.80"
