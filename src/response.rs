@@ -118,7 +118,7 @@ mod tests {
     #[test]
     fn test_simple_item() -> Result<()> {
         let mut response = Response::new();
-        response.items(vec![Item::new("Simple Title").into()]);
+        response.items(vec![Item::new("Simple Title")]);
         assert_matches(r#"{"items":[{"title":"Simple Title"}]}"#, response)
     }
 
