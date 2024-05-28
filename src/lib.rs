@@ -5,9 +5,11 @@ mod data;
 mod error;
 mod item;
 mod response;
+mod url_item;
 
-pub use item::{filter_and_sort_items, Item, Key, Modifier, URLItem};
+pub use item::{filter_and_sort_items, Icon, Item, Key, Modifier};
 pub use response::Response;
+pub use url_item::URLItem;
 
 pub use cache::cache_dir;
 pub use data::data_dir;
