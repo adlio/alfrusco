@@ -13,9 +13,6 @@ use crate::Response;
 #[derive(Parser, Debug)]
 struct ClipboardCli {
     #[arg(short, long, env)]
-    verbose: bool,
-
-    #[arg(short, long, env)]
     title: Option<String>,
 
     #[arg(short, long, env)]
@@ -23,8 +20,6 @@ struct ClipboardCli {
 
     #[arg(short, long, env)]
     alfrusco_command: Option<String>,
-
-    query: Vec<String>,
 }
 
 pub fn handle_clipboard() {
