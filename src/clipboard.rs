@@ -20,25 +20,36 @@ struct ClipboardCli {
 
     #[arg(short, long, env)]
     alfrusco_command: Option<String>,
+
+    /// query is not used, but it is necessary to prevent arguments
+    /// supplied to the command from being treated as flags inside
+    /// Alfrusco's clipboard handler
+    query: Vec<String>,
 }
 
 pub fn handle_clipboard() {
     info!("handle_clipboard checking...");
-    let args = ClipboardCli::parse();
-    if let Some(command) = args.alfrusco_command {
-        if let Some(title) = args.title {
-            if let Some(url) = args.url {
-                info!("alfrusco handling clipboard command: {}", command);
-                if command == "richtext" {
-                    copy_rich_text_link_to_clipboard(title, url);
-                    write_empty_items().unwrap();
-                    std::process::exit(0);
-                } else if command == "markdown" {
-                    copy_markdown_link_to_clipboard(title, url);
-                    write_empty_items().unwrap();
-                    std::process::exit(0);
+    match ClipboardCli::try_parse() {
+        Ok(args) => {
+            if let Some(command) = args.alfrusco_command {
+                if let Some(title) = args.title {
+                    if let Some(url) = args.url {
+                        info!("alfrusco handling clipboard command: {}", command);
+                        if command == "richtext" {
+                            copy_rich_text_link_to_clipboard(title, url);
+                            write_empty_items().unwrap();
+                            std::process::exit(0);
+                        } else if command == "markdown" {
+                            copy_markdown_link_to_clipboard(title, url);
+                            write_empty_items().unwrap();
+                            std::process::exit(0);
+                        }
+                    }
                 }
             }
+        }
+        Err(e) => {
+            info!("Skipping alfruco handle_clipboard due to: {}", e);
         }
     }
 }
