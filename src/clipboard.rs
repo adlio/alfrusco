@@ -49,7 +49,7 @@ pub fn handle_clipboard() {
             }
         }
         Err(e) => {
-            info!("Skipping alfruco handle_clipboard due to: {}", e);
+            info!("Skipping alfruco handle_clipboard. CLI parse didn't include title, url, or alfrusco_command");
         }
     }
 }
