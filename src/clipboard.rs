@@ -1,7 +1,6 @@
-use anyhow::Result;
 use clap::Parser;
 
-use log::info;
+use log::{debug, info};
 use std::process::Command;
 
 use clipboard::ClipboardContext;
@@ -9,6 +8,7 @@ use clipboard::ClipboardProvider;
 use hex::encode;
 
 use crate::Response;
+use crate::Result;
 
 #[derive(Parser, Debug)]
 struct ClipboardCli {
@@ -48,8 +48,8 @@ pub fn handle_clipboard() {
                 }
             }
         }
-        Err(e) => {
-            info!("Skipping alfruco handle_clipboard. CLI parse didn't include title, url, or alfrusco_command");
+        Err(_) => {
+            debug!("Skipping alfruco handle_clipboard. CLI parse didn't include title, url, or alfrusco_command");
         }
     }
 }

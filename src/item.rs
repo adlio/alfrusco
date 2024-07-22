@@ -1,9 +1,10 @@
-use anyhow::Result;
+use std::collections::HashMap;
+
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 
-use std::collections::HashMap;
+use crate::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(untagged)]
