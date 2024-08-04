@@ -1,13 +1,15 @@
-use crate::Item;
-use crate::Result;
-use serde::{Serialize, Serializer};
 use std::io;
 use std::time::Duration;
 
+use serde::{Serialize, Serializer};
+
+use crate::Item;
+use crate::Result;
+
 /// Represents a complete Alfred response consisting of Items to display in
 /// Alfred's UI and optional configuration settings to control re-running
-/// the workflow an disabling Alfred's learning of the response the user
-/// selected to re-order items on future runs.
+/// the workflow, caching, and disabling Alfred's learning of the response
+/// the user selected (skip_knowledge).
 ///
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -24,10 +26,11 @@ pub struct Response {
 
     /// If true, Alfred will not learn from the user's selection
     #[serde(rename = "skipknowledge", skip_serializing_if = "Option::is_none")]
-    skip_knowledge: Option<bool>,
+    pub(crate) skip_knowledge: Option<bool>,
 
     /// The items to display in Alfred's output
-    items: Vec<Item>,
+    pub(crate) items: Vec<Item>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct CacheSettings {
@@ -67,7 +70,6 @@ impl Response {
         self
     }
 
-    /// Extends the existing vec of Items with the provided Vec of Items.
     /// Enables the Alfred 5.5+ cache feature with the provided cache duration.
     /// If loose_reload is true, Alfred will return the stale results while
     /// waiting for the cache to be updated.
@@ -80,8 +82,22 @@ impl Response {
         self
     }
 
+    /// Replaces the existing items in the response with the provided ones.
     pub fn items(&mut self, items: Vec<Item>) -> &mut Self {
+        self.items = items;
+        self
+    }
+
+    /// Appends the provided items to the end of the existing items in the reponse.
+    pub fn append_items(&mut self, items: Vec<Item>) -> &mut Self {
         self.items.extend(items);
+        self
+    }
+
+    /// Prepends the provided items to the beginning of the existing items in the
+    /// response.
+    pub fn prepend_items(&mut self, items: Vec<Item>) -> &mut Self {
+        self.items.splice(0..0, items);
         self
     }
 
