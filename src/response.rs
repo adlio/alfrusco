@@ -19,12 +19,26 @@ pub struct Response {
     )]
     rerun: Option<Duration>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache: Option<CacheSettings>,
+
     /// If true, Alfred will not learn from the user's selection
     #[serde(rename = "skipknowledge", skip_serializing_if = "Option::is_none")]
     skip_knowledge: Option<bool>,
 
     /// The items to display in Alfred's output
     items: Vec<Item>,
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct CacheSettings {
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "duration_as_seconds"
+    )]
+    pub seconds: Option<Duration>,
+
+    #[serde(skip_serializing_if = "Option::is_none", rename = "loosereload")]
+    pub loose_reload: Option<bool>,
 }
 
 impl Response {
@@ -54,6 +68,18 @@ impl Response {
     }
 
     /// Extends the existing vec of Items with the provided Vec of Items.
+    /// Enables the Alfred 5.5+ cache feature with the provided cache duration.
+    /// If loose_reload is true, Alfred will return the stale results while
+    /// waiting for the cache to be updated.
+    ///
+    pub fn cache(&mut self, duration: Duration, loose_reload: bool) -> &mut Self {
+        self.cache = Some(CacheSettings {
+            seconds: Some(duration),
+            loose_reload: Some(loose_reload),
+        });
+        self
+    }
+
     pub fn items(&mut self, items: Vec<Item>) -> &mut Self {
         self.items.extend(items);
         self
@@ -113,6 +139,16 @@ mod tests {
         let mut response = Response::new();
         response.skip_knowledge(true);
         assert_matches(r#"{"skipknowledge":true,"items":[]}"#, response)
+    }
+
+    #[test]
+    fn test_cache() -> Result<()> {
+        let mut response = Response::new();
+        response.cache(Duration::from_secs(10800), true);
+        assert_matches(
+            r#"{"cache":{"seconds":10800.0,"loosereload":true},"items":[]}"#,
+            response,
+        )
     }
 
     #[test]
