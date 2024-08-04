@@ -1,10 +1,10 @@
-.PHONY: test coverage
+.PHONY: build build-examples test coverage
 
 test:
 	cargo test
 
 build:
-	cargo build
+	cargo build --all
 
 static_output_example: build
 	./target/debug/examples/static_output
