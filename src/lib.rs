@@ -10,6 +10,7 @@ pub use workflow::Workflow;
 pub use workflow_config::WorkflowConfig;
 
 mod background;
+mod background_job;
 mod cache;
 mod clipboard;
 pub mod config;
