@@ -89,16 +89,14 @@ impl Response {
     }
 
     /// Appends the provided items to the end of the existing items in the reponse.
-    pub fn append_items(&mut self, items: Vec<Item>) -> &mut Self {
+    pub fn append_items(&mut self, items: Vec<Item>) {
         self.items.extend(items);
-        self
     }
 
     /// Prepends the provided items to the beginning of the existing items in the
     /// response.
-    pub fn prepend_items(&mut self, items: Vec<Item>) -> &mut Self {
+    pub fn prepend_items(&mut self, items: Vec<Item>) {
         self.items.splice(0..0, items);
-        self
     }
 
     /// Writes the Alfred response to the provided writer.
