@@ -1,5 +1,5 @@
-use std::{env, fs};
 use std::path::PathBuf;
+use std::{env, fs};
 
 use crate::Result;
 
@@ -26,9 +26,9 @@ const VAR_KEYWORD: &str = "alfred_keyword";
 /// The from_env() constructor is the primary way to create a WorkflowConfig.
 ///
 /// See https://www.alfredapp.com/help/workflows/script-environment-variables/
-/// for more information on the Alfred workflow environment variables.
-#[derive(Debug, Default)]
 pub struct WorkflowConfig {
+    pub writer: Box<dyn std::io::Write>,
+
     pub preferences: String,
     pub preferences_localhash: String,
     pub theme: String,
@@ -56,6 +56,8 @@ impl WorkflowConfig {
         let keyword = env::var(VAR_KEYWORD).ok();
 
         Ok(WorkflowConfig {
+            writer: Box::new(std::io::stdout()),
+
             preferences: env::var(VAR_PREFERENCES)?,
             preferences_localhash: env::var(VAR_PREFERENCES_LOCALHASH)?,
             theme: env::var(VAR_THEME)?,
@@ -87,6 +89,9 @@ impl WorkflowConfig {
         fs::create_dir_all(&workflow_cache)?;
 
         Ok(WorkflowConfig {
+            // TODO Make this a buffer to ease testing?
+            writer: Box::new(std::io::stdout()),
+
             preferences: "/Users/Crayons/Dropbox/Alfred/Alfred.alfredpreferences".to_string(),
             preferences_localhash: "adbd4f66bc3ae8493832af61a41ee609b20d8705".to_string(),
             theme: "alfred.theme.yosemite".to_string(),
