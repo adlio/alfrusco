@@ -1,50 +1,74 @@
 use std::path::PathBuf;
 
-use crate::{Item, Result};
-
-const VAR_WORKFLOW_NAME: &str = "alfred_workflow_name";
-const VAR_WORKFLOW_BUNDLE_ID: &str = "alfred_workflow_bundleid";
-const VAR_WORKFLOW_VERSION: &str = "alfred_workflow_version";
-const VAR_WORKFLOW_UID: &str = "alfred_workflow_uid";
-const VAR_WORKFLOW_CACHE_DIR: &str = "alfred_workflow_cache";
-const VAR_WORKFLOW_DATA_DIR: &str = "alfred_workflow_data";
-const VAR_DEBUG: &str = "alfred_debug";
-const VAR_THEME: &str = "alfred_theme";
-const VAR_THEME_BG: &str = "alfred_theme_background";
-const VAR_THEME_SELECTION_BG: &str = "alfred_theme_selection_background";
-const VAR_VERSION: &str = "alfred_version";
-const VAR_VERSION_BUILD: &str = "alfred_version_build";
-const VAR_PREFERENCES: &str = "alfred_preferences";
-const VAR_PREFERENCES_LOCAL_HASH: &str = "alfred_preferences_localhash";
+use crate::{handle, Item, Response};
+use crate::Result;
+use crate::WorkflowConfig;
 
 pub struct Workflow {
-    pub name: String,
-    pub data_dir: PathBuf,
-    pub cache_dir: PathBuf,
-
-    pub items: Vec<Item>,
+    pub config: WorkflowConfig,
+    pub response: Response,
+    pub writer: Box<dyn std::io::Write>,
 }
 
 impl Workflow {
     /// Creates a new Workflow instance by reading the environment variables.
-    /// This will fail with a an Error::VarError if any of the required
+    /// This will fail with an Error::VarError if any of the required
     /// environment variables are not set.
     ///
-    /// See https://www.alfredapp.com/help/workflows/script-environment-variables/
-    /// for more information on the Alfred workflow environment variables.
-    pub fn new() -> Result<Workflow> {
-        let name = std::env::var(VAR_WORKFLOW_NAME)?;
-        let cache_dir = std::env::var(VAR_WORKFLOW_CACHE_DIR)?;
-        let data_dir = std::env::var(VAR_WORKFLOW_DATA_DIR)?;
+    pub fn new(config: WorkflowConfig) -> Workflow {
+        Workflow {
+            config,
+            response: Response::new(),
+            writer: Box::new(std::io::stdout()),
+        }
+    }
 
-        Ok({
-            Workflow {
-                name,
-                data_dir: PathBuf::from(data_dir),
-                cache_dir: PathBuf::from(cache_dir),
-                items: Vec::new(),
+    pub fn new_from_env() -> Result<Workflow> {
+        let config = WorkflowConfig::from_env()?;
+        Ok(Workflow::new(config))
+    }
+
+    pub fn new_for_testing() -> Result<Workflow> {
+        let config = WorkflowConfig::for_testing()?;
+        Ok(Workflow::new(config))
+    }
+
+    pub fn cache_dir(&self) -> &PathBuf {
+        &self.config.workflow_cache
+    }
+
+    pub fn data_dir(&self) -> &PathBuf {
+        &self.config.workflow_data
+    }
+
+    /// run accepts a function which takes a mutable borrow of the
+    /// Workflow, and returns a Result. The function is expected to
+    /// call methods on the Workflow or its response. If the function
+    /// returns an error, that error is prepended as an error item
+    /// in the response.
+    pub fn run(
+        config: WorkflowConfig,
+        f: impl FnOnce(&mut Workflow) -> std::result::Result<(), Box<dyn std::error::Error>>,
+    ) {
+        let mut workflow = Workflow::new(config);
+
+        // If the response includes alfrusco clipboard instructions, handle them
+        // first
+        handle();
+
+        let result = f(&mut workflow);
+        if let Err(err) = result {
+            let error_item = Item::new(format!("Error: {}", err))
+                .subtitle("Check the logs for more information.");
+            workflow.response.prepend_items(vec![error_item]);
+        }
+        match workflow.response.write(&mut workflow.writer) {
+            Ok(_) => std::process::exit(0),
+            Err(e) => {
+                eprintln!("Error writing response: {}", e);
+                std::process::exit(1);
             }
-        })
+        }
     }
 }
 
@@ -54,6 +78,6 @@ mod tests {
 
     #[test]
     fn test_new_workflow() {
-        let _workflow = Workflow::new().unwrap();
+        let _wf = Workflow::new_for_testing();
     }
 }
