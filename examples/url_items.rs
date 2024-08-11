@@ -1,20 +1,18 @@
-use alfrusco::{Response, URLItem};
+use std::time::Duration;
+
+use alfrusco::{URLItem, Workflow};
 
 pub fn main() {
-    alfrusco::handle();
+    let config = alfrusco::WorkflowConfig::for_testing().unwrap();
+    alfrusco::Workflow::run(config, run);
+}
 
-    let mut response = Response::new();
-    response.skip_knowledge(true);
-    response.items(vec![
+pub fn run(wf: &mut Workflow) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = wf.response.skip_knowledge(true);
+    let _ = wf.response.cache(Duration::from_secs(60), true);
+    wf.response.append_items(vec![
         URLItem::new("DuckDuckGo", "https://www.duckduckgo.com").into(),
         URLItem::new("Google", "https://www.google.com").into(),
     ]);
-
-    match response.write(std::io::stdout()) {
-        Ok(_) => std::process::exit(0),
-        Err(e) => {
-            eprintln!("Error writing response: {}", e);
-            std::process::exit(1);
-        }
-    }
+    Ok(())
 }
