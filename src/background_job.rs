@@ -116,6 +116,7 @@ impl BackgroundJob {
         }
     }
 
+    /*
     fn update_last_completion(&self) -> crate::Result<()> {
         // We write the time in the local time zone. This is mainly for human legibility.
         // We actually use the modified timestamp of the file to determine the age
@@ -125,4 +126,5 @@ impl BackgroundJob {
         )?;
         Ok(())
     }
+    */
 }
