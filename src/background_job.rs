@@ -80,7 +80,7 @@ impl BackgroundJob {
         match self.get_pid() {
             Ok(pid) => {
                 let mut system = System::new_all();
-                system.refresh_processes();
+                // system.refresh_processes();
                 system.process(sysinfo::Pid::from(pid as usize)).map(|p| {
                     let start_time = UNIX_EPOCH + Duration::from_secs(p.start_time());
                     SystemTime::now()
