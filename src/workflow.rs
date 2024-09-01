@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::{handle, Item, Response};
 use crate::Result;
 use crate::WorkflowConfig;
+use crate::{handle, Item, Response};
 
 pub struct Workflow {
     pub config: WorkflowConfig,

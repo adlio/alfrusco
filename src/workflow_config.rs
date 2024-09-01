@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::{env, fs};
 
+use crate::Error;
 use crate::Result;
 
 const VAR_PREFERENCES: &str = "alfred_preferences";
@@ -50,32 +51,39 @@ pub struct WorkflowConfig {
 
 impl WorkflowConfig {
     pub fn from_env() -> Result<WorkflowConfig> {
-        let debug = env::var(VAR_DEBUG)?;
+        let debug = env::var(VAR_DEBUG).unwrap_or_default();
         let debug = debug == "1" || debug.to_lowercase() == "true";
 
         let keyword = env::var(VAR_KEYWORD).ok();
 
-        Ok(WorkflowConfig {
+        let config = WorkflowConfig {
             writer: Box::new(std::io::stdout()),
 
-            preferences: env::var(VAR_PREFERENCES)?,
-            preferences_localhash: env::var(VAR_PREFERENCES_LOCALHASH)?,
-            theme: env::var(VAR_THEME)?,
-            theme_background: env::var(VAR_THEME_BACKGROUND)?,
-            theme_selection_background: env::var(VAR_THEME_SELECTION_BACKGROUND)?,
-            theme_subtext: env::var(VAR_THEME_SUBTEXT)?,
-            version: env::var(VAR_VERSION)?,
-            version_build: env::var(VAR_VERSION_BUILD)?,
-            workflow_bundleid: env::var(VAR_WORKFLOW_BUNDLEID)?,
-            workflow_cache: env::var(VAR_WORKFLOW_CACHE)?.into(),
-            workflow_data: env::var(VAR_WORKFLOW_DATA)?.into(),
-            workflow_name: env::var(VAR_WORKFLOW_NAME)?,
-            workflow_description: env::var(VAR_WORKFLOW_DESCRIPTION)?,
-            workflow_version: env::var(VAR_WORKFLOW_VERSION)?,
-            workflow_uid: env::var(VAR_WORKFLOW_UID)?,
+            preferences: env::var(VAR_PREFERENCES).ok().unwrap_or_default(),
+            preferences_localhash: env::var(VAR_PREFERENCES_LOCALHASH).ok().unwrap_or_default(),
+            theme: env::var(VAR_THEME).ok().unwrap_or_default(),
+            theme_background: env::var(VAR_THEME_BACKGROUND).ok().unwrap_or_default(),
+            theme_selection_background: env::var(VAR_THEME_SELECTION_BACKGROUND)
+                .ok()
+                .unwrap_or_default(),
+            theme_subtext: env::var(VAR_THEME_SUBTEXT).ok().unwrap_or_default(),
+            version: env::var(VAR_VERSION).ok().unwrap_or_default(),
+            version_build: env::var(VAR_VERSION_BUILD).ok().unwrap_or_default(),
+            workflow_bundleid: env::var(VAR_WORKFLOW_BUNDLEID).ok().unwrap_or_default(),
+            workflow_cache: env::var(VAR_WORKFLOW_CACHE).ok().unwrap_or_default().into(),
+            workflow_data: env::var(VAR_WORKFLOW_DATA).ok().unwrap_or_default().into(),
+            workflow_name: env::var(VAR_WORKFLOW_NAME).ok().unwrap_or_default(),
+            workflow_description: env::var(VAR_WORKFLOW_DESCRIPTION).ok().unwrap_or_default(),
+            workflow_version: env::var(VAR_WORKFLOW_VERSION).ok().unwrap_or_default(),
+            workflow_uid: env::var(VAR_WORKFLOW_UID).ok().unwrap_or_default(),
             debug,
             keyword,
-        })
+        };
+
+        std::fs::create_dir_all(&config.workflow_cache)?;
+        std::fs::create_dir_all(&config.workflow_data)?;
+
+        Ok(config)
     }
 
     pub fn for_testing() -> Result<WorkflowConfig> {
