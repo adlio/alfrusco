@@ -6,6 +6,7 @@ pub enum Error {
     ParseIntError(std::num::ParseIntError),
     Serde(serde_json::Error),
     Var(std::env::VarError),
+    MissingEnvVar(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -19,6 +20,7 @@ impl std::fmt::Display for Error {
             Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
             Error::Serde(ref err) => write!(f, "Serde Error: {}", err),
             Error::Var(ref err) => write!(f, "Var Error: {}", err),
+            Error::MissingEnvVar(ref var) => write!(f, "Missing environment variable: {}", var),
         }
     }
 }
@@ -68,6 +70,7 @@ impl std::error::Error for Error {
             Error::ParseIntError(ref err) => Some(err),
             Error::Serde(ref err) => Some(err),
             Error::Var(ref err) => Some(err),
+            Error::MissingEnvVar(_) => None,
         }
     }
 }
