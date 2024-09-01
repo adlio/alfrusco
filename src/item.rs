@@ -76,8 +76,8 @@ pub struct Item {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) valid: Option<bool>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) matches: Option<String>,
+    #[serde(rename = "match", skip_serializing_if = "Option::is_none")]
+    pub(crate) r#match: Option<String>,
 
     #[serde(rename = "mods", skip_serializing_if = "HashMap::is_empty")]
     pub(crate) modifiers: HashMap<String, Modifier>,
@@ -161,8 +161,8 @@ impl Item {
         self
     }
 
-    pub fn matches(mut self, matches: impl Into<String>) -> Self {
-        self.matches = Some(matches.into());
+    pub fn r#match(mut self, matches: impl Into<String>) -> Self {
+        self.r#match = Some(matches.into());
         self
     }
 
