@@ -10,7 +10,7 @@ workflow:
 	cp target/release/examples/static_output workflow/
 
 build:
-	cargo build --all-targets
+	cargo build --all-targets --all-features --examples
 
 static_output_example: build
 	./target/debug/examples/static_output
