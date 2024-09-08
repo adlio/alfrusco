@@ -5,7 +5,6 @@ use fuzzy_matcher::FuzzyMatcher;
 use serde::Serialize;
 
 use crate::Icon;
-use crate::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(untagged)]

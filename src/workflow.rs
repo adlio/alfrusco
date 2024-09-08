@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{env, fs};
 
-use crate::{filter_and_sort_items, handle, Error, Item, Response, Result};
+use crate::{filter_and_sort_items, handle, Item, Response, Result};
 
 const VAR_PREFERENCES: &str = "alfred_preferences";
 const VAR_PREFERENCES_LOCALHASH: &str = "alfred_preferences_localhash";
