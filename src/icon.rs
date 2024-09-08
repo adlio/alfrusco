@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 pub const ICON_ROOT: &str = "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources";
 
 pub const ICON_ACCOUNT: &str =
@@ -43,3 +45,11 @@ pub const ICON_WARNING: &str =
     "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/AlertCautionIcon.icns";
 pub const ICON_WEB: &str =
     "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/BookmarkIcon.icns";
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Icon {
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub(crate) type_: Option<String>,
+
+    pub(crate) path: String,
+}
