@@ -1,8 +1,9 @@
 use std::io::Write;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{env, fs};
 
-use crate::{handle, Error, Item, Response, Result};
+use crate::{filter_and_sort_items, handle, Error, Item, Response, Result};
 
 const VAR_PREFERENCES: &str = "alfred_preferences";
 const VAR_PREFERENCES_LOCALHASH: &str = "alfred_preferences_localhash";
@@ -48,6 +49,7 @@ pub struct Workflow {
     pub debug: bool,
 
     pub keyword: Option<String>,
+    pub sort_and_filter_results: bool,
 
     pub response: Response,
 }
@@ -82,6 +84,7 @@ impl Workflow {
             workflow_uid: env::var(VAR_WORKFLOW_UID).ok().unwrap_or_default(),
             debug,
             keyword,
+            sort_and_filter_results: false,
             response: Response::new(),
         };
 
@@ -122,12 +125,22 @@ impl Workflow {
             workflow_uid: "user.workflow.B0AC54EC-601C-479A-9428-01F9FD732959".to_string(),
             debug: true,
             keyword: Some("search-keyword".to_string()),
+            sort_and_filter_results: false,
             response: Response::new(),
         })
     }
 
+    pub fn set_filter_keyword(&mut self, keyword: String) {
+        self.keyword = Some(keyword);
+        self.response.rerun(Duration::from_millis(500));
+        self.sort_and_filter_results = true;
+    }
+
     /// Runs
-    pub fn run(&mut self, f: impl FnOnce(&mut Workflow) -> std::result::Result<(), Error>) {
+    pub fn run<E>(&mut self, f: impl FnOnce(&mut Workflow) -> std::result::Result<(), E>)
+    where
+        E: std::fmt::Display,
+    {
         // If the response includes alfrusco clipboard instructions, handle them
         // first
         handle();
@@ -138,6 +151,14 @@ impl Workflow {
                 .subtitle("Check the logs for more information.");
             self.response.prepend_items(vec![error_item]);
         }
+
+        if self.sort_and_filter_results {
+            if let Some(keyword) = self.keyword.clone() {
+                // TODO Don't clone the items
+                self.response.items = filter_and_sort_items(self.response.items.clone(), keyword)
+            }
+        }
+
         match self.response.write(&mut self.writer) {
             Ok(_) => std::process::exit(0),
             Err(e) => {
