@@ -2,26 +2,26 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::Duration;
 
-use crate::background_job::{BackgroundJob, BackgroundJobStatus};
-use crate::Result;
+use crate::background_job::BackgroundJob;
 use crate::Workflow;
 
 impl Workflow {
-    pub fn run_in_background(
-        &self,
-        job_name: &str,
-        max_age: Duration,
-        cmd: Command,
-    ) -> Result<BackgroundJobStatus> {
-        let job_path = self.jobs_dir().join(job_name);
-        std::fs::create_dir_all(&job_path)?;
-
-        let mut job = BackgroundJob::new(job_path, max_age, cmd);
-        job.run_if_needed()
+    /// Ensure that a particular command is run at least as often as the
+    /// provided max_age value. A background job status item is added to
+    /// the response items if the job is stale to inform the user that
+    /// work is being done in the background to update results.
+    ///
+    pub fn run_in_background(&mut self, job_key: &str, max_age: Duration, cmd: Command) {
+        let mut job = BackgroundJob::new(self, job_key, max_age, cmd);
+        let job_item = job.run();
+        match job_item {
+            Some(item) => self.response.prepend_items(vec![item]),
+            None => (),
+        };
     }
 
     /// Returns the path to the cache subdirectory where jobs data is held
     pub fn jobs_dir(&self) -> PathBuf {
-        self.cache_dir().join("jobs")
+        self.workflow_cache.join("jobs")
     }
 }

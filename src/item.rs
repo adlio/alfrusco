@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
+use crate::Icon;
 use crate::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
@@ -244,14 +245,6 @@ impl Modifier {
         self.valid = Some(valid);
         self
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct Icon {
-    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-    pub(crate) type_: Option<String>,
-
-    pub(crate) path: String,
 }
 
 /// Text defines the two text options for an Alfred Item. copy is the text

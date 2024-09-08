@@ -53,3 +53,12 @@ pub struct Icon {
 
     pub(crate) path: String,
 }
+
+impl From<&str> for Icon {
+    fn from(path: &str) -> Self {
+        Icon {
+            type_: None,
+            path: path.to_string(),
+        }
+    }
+}

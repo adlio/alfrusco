@@ -1,13 +1,12 @@
-use alfrusco::{Item, Workflow};
+use alfrusco::{Error, Item, Workflow};
 
 pub fn main() {
-    let config = alfrusco::WorkflowConfig::for_testing().unwrap();
-    alfrusco::Workflow::run(config, run);
+    alfrusco::Workflow::for_testing().unwrap().run(run);
 }
 
-pub fn run(wf: &mut Workflow) -> Result<(), Box<dyn std::error::Error>> {
+pub fn run(wf: &mut Workflow) -> Result<(), Error> {
     let _ = &wf.response.skip_knowledge(true);
-    &wf.response.append_items(vec![
+    let _ = &wf.response.append_items(vec![
         Item::new("First Option").subtitle("First Subtitle"),
         Item::new("Option 2").subtitle("Second Subtitle"),
         Item::new("Three").subtitle("3"),
