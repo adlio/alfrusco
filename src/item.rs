@@ -162,7 +162,7 @@ impl Item {
         self
     }
 
-    pub fn r#match(mut self, matches: impl Into<String>) -> Self {
+    pub fn matches(mut self, matches: impl Into<String>) -> Self {
         self.r#match = Some(matches.into());
         self
     }
@@ -259,21 +259,22 @@ pub struct Text {
     pub(crate) large_type: Option<String>,
 }
 
-pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Result<Vec<Item>> {
+pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
     let matcher = SkimMatcherV2::default();
 
     let mut filtered_items: Vec<(Item, i64)> = items
         .into_iter()
         .filter_map(|item| {
+            let subtitle = item.subtitle.as_deref().unwrap_or_default();
+            let combined = format!("{} : {}", subtitle, item.title);
             matcher
-                .fuzzy_match(&item.title, &query)
+                .fuzzy_match(&combined, &query)
                 .map(|score| (item, score))
         })
         .collect();
 
     // Sort by score in descending order
-    filtered_items.sort_by(|a, b| b.1.cmp(&a.1));
+    filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
-    let items = filtered_items.into_iter().map(|(item, _)| item).collect();
-    Ok(items)
+    filtered_items.into_iter().map(|(item, _)| item).collect()
 }
