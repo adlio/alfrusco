@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::{env, fs};
 
+use crate::error::WorkflowError;
 use crate::{filter_and_sort_items, handle, Item, Response, Result};
 
 const VAR_PREFERENCES: &str = "alfred_preferences";
@@ -130,6 +131,16 @@ impl Workflow {
         })
     }
 
+    /// Sets the filter keyword for the workflow and enables sorting and filtering of results.
+    ///
+    /// This function performs the following actions:
+    /// 1. Sets the `keyword` field of the workflow to the provided keyword.
+    /// 2. Schedules a rerun of the workflow after a 500ms delay.
+    /// 3. Enables sorting and filtering of results.
+    ///
+    /// # Arguments
+    ///
+    /// * `keyword` - A String that will be used as the new filter keyword.
     pub fn set_filter_keyword(&mut self, keyword: String) {
         self.keyword = Some(keyword);
         self.response.rerun(Duration::from_millis(500));
@@ -137,10 +148,7 @@ impl Workflow {
     }
 
     /// Runs
-    pub fn run<E>(&mut self, f: impl FnOnce(&mut Workflow) -> std::result::Result<(), E>)
-    where
-        E: std::fmt::Display,
-    {
+    pub fn run(&mut self, f: impl FnOnce(&mut Workflow) -> std::result::Result<(), WorkflowError>) {
         // If the response includes alfrusco clipboard instructions, handle them
         // first
         handle();
@@ -166,5 +174,30 @@ impl Workflow {
                 std::process::exit(1);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sync_run_success() {
+        let mut wf = Workflow::for_testing().unwrap();
+        wf.run(|wf| {
+            wf.response
+                .append_items(vec![Item::new("Test Item").subtitle("Test Subtitle")]);
+            Ok(())
+        });
+        assert_eq!(wf.response.items.len(), 1);
+        assert_eq!(wf.response.items[0].title, "Test Item");
+    }
+
+    #[test]
+    fn test_sync_run_error() {
+        let mut wf = Workflow::for_testing().unwrap();
+        wf.run(|_wf| Err::<(), _>("Test error".into()));
+        assert_eq!(wf.response.items.len(), 1);
+        assert!(wf.response.items[0].title.contains("Error"));
     }
 }
