@@ -1,10 +1,10 @@
-use alfrusco::{Error, Item, Workflow};
+use alfrusco::{Item, Workflow, WorkflowError};
 
 pub fn main() {
     alfrusco::Workflow::for_testing().unwrap().run(run);
 }
 
-pub fn run(wf: &mut Workflow) -> Result<(), Error> {
+pub fn run(wf: &mut Workflow) -> Result<(), WorkflowError> {
     let _ = &wf.response.skip_knowledge(true);
     let _ = &wf.response.append_items(vec![
         Item::new("First Option").subtitle("First Subtitle"),

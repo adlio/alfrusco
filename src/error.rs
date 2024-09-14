@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub enum Error {
     Io(std::io::Error),
@@ -72,5 +74,75 @@ impl std::error::Error for Error {
             Error::Var(ref err) => Some(err),
             Error::MissingEnvVar(_) => None,
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct WorkflowError {
+    message: String,
+}
+
+impl WorkflowError {
+    pub fn new<T: Into<String>>(message: T) -> Self {
+        WorkflowError {
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for WorkflowError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for WorkflowError {}
+
+// Implement From for common error types
+impl From<std::io::Error> for WorkflowError {
+    fn from(err: std::io::Error) -> Self {
+        WorkflowError::new(err.to_string())
+    }
+}
+
+impl From<String> for WorkflowError {
+    fn from(err: String) -> Self {
+        WorkflowError::new(err)
+    }
+}
+
+impl From<&str> for WorkflowError {
+    fn from(err: &str) -> Self {
+        WorkflowError::new(err)
+    }
+}
+
+impl From<std::fmt::Error> for WorkflowError {
+    fn from(err: std::fmt::Error) -> WorkflowError {
+        WorkflowError::new(err.to_string())
+    }
+}
+
+impl From<std::string::FromUtf8Error> for WorkflowError {
+    fn from(err: std::string::FromUtf8Error) -> WorkflowError {
+        WorkflowError::new(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for WorkflowError {
+    fn from(err: serde_json::Error) -> WorkflowError {
+        WorkflowError::new(err.to_string())
+    }
+}
+
+impl From<std::num::ParseIntError> for WorkflowError {
+    fn from(err: std::num::ParseIntError) -> WorkflowError {
+        WorkflowError::new(err.to_string())
+    }
+}
+
+impl From<std::env::VarError> for WorkflowError {
+    fn from(err: std::env::VarError) -> WorkflowError {
+        WorkflowError::new(err.to_string())
     }
 }

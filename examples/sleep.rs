@@ -1,12 +1,12 @@
 use std::{process::Command, time::Duration};
 
-use alfrusco::{Error, URLItem, Workflow};
+use alfrusco::{URLItem, Workflow, WorkflowError};
 
 pub fn main() {
     Workflow::from_env().unwrap().run(run);
 }
 
-pub fn run(wf: &mut Workflow) -> Result<(), Error> {
+pub fn run(wf: &mut Workflow) -> Result<(), WorkflowError> {
     let _ = wf.response.skip_knowledge(true);
     let _ = wf.response.rerun(Duration::from_millis(500));
 

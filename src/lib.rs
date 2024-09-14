@@ -2,7 +2,7 @@ pub use cache::cache_dir;
 pub use clipboard::copy_markdown_link_to_clipboard;
 pub use clipboard::copy_rich_text_link_to_clipboard;
 pub use data::data_dir;
-pub use error::{Error, Result};
+pub use error::{Error, Result, WorkflowError};
 pub use icon::{Icon, *};
 pub use item::{filter_and_sort_items, Item, Key, Modifier};
 pub use response::Response;
