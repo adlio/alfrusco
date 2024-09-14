@@ -11,6 +11,7 @@ pub enum Error {
     MissingEnvVar(String),
 }
 
+pub type WorkflowResult = std::result::Result<(), WorkflowError>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl std::fmt::Display for Error {
