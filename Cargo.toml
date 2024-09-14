@@ -6,6 +6,7 @@ description = "Utilities for building Alfred workflows with Rust."
 license = "MIT"
 
 [dependencies]
+async-trait = "0"
 chrono = "0"
 clap = { version = "4.5", features = ["derive", "env"] }
 clipboard = "0"
@@ -17,6 +18,8 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0"
+tokio = { version = "1", features = ["full"]}
 
 [dev-dependencies]
 tempfile = "3"
+tokio = { version = "1", features = ["full", "test-util"] }
