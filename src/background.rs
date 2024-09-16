@@ -22,6 +22,6 @@ impl Workflow {
 
     /// Returns the path to the cache subdirectory where jobs data is held
     pub fn jobs_dir(&self) -> PathBuf {
-        self.workflow_cache.join("jobs")
+        self.config.workflow_cache.join("jobs")
     }
 }
