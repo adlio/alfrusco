@@ -14,3 +14,5 @@ Cargo.lock
 *.pdb
 
 tarpaulin-report.html
+
+spec.md
