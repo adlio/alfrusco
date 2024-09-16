@@ -8,6 +8,7 @@ mod item;
 mod response;
 mod url_item;
 mod workflow;
+mod workflow_config;
 
 pub use clipboard::copy_markdown_link_to_clipboard;
 pub use clipboard::copy_rich_text_link_to_clipboard;
