@@ -1,7 +1,7 @@
 .PHONY: build build-examples test coverage workflow
 
 test:
-	cargo test
+	cargo test --all-targets --all-features
 
 workflow:
 	cargo build --all-targets --release && \
@@ -11,6 +11,9 @@ workflow:
 
 build:
 	cargo build --all-targets --all-features --examples
+
+release:
+	cargo build --all-targets --all-features --examples --release
 
 static_output_example: build
 	./target/debug/examples/static_output
@@ -22,4 +25,4 @@ url_items_example: target/debug/examples/url_items
 	./target/debug/examples/url_items example | jq
 
 coverage:
-	cargo tarpaulin --exclude-files tests/* --out Html
+	cargo tarpaulin --all-targets --all-features --examples --exclude-files tests/* --out Html
