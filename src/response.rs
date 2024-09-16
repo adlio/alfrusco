@@ -45,11 +45,6 @@ pub struct CacheSettings {
 }
 
 impl Response {
-    /// Creates a new, empty Alfred response.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Creates a new Alfred response with the provided Vec of Items.
     pub fn new_with_items(items: Vec<Item>) -> Self {
         Self {
@@ -124,7 +119,7 @@ mod tests {
 
     #[test]
     fn test_empty_response() -> Result<()> {
-        let response = Response::new();
+        let response = Response::default();
         assert_matches(r#"{"items":[]}"#, response)
     }
 
@@ -143,21 +138,21 @@ mod tests {
 
     #[test]
     fn test_rerun_serialization() -> Result<()> {
-        let mut response = Response::new();
+        let mut response = Response::default();
         response.rerun(Duration::from_secs(5));
         assert_matches(r#"{"rerun":5.0,"items":[]}"#, response)
     }
 
     #[test]
     fn test_skip_knowledge() -> Result<()> {
-        let mut response = Response::new();
+        let mut response = Response::default();
         response.skip_knowledge(true);
         assert_matches(r#"{"skipknowledge":true,"items":[]}"#, response)
     }
 
     #[test]
     fn test_cache() -> Result<()> {
-        let mut response = Response::new();
+        let mut response = Response::default();
         response.cache(Duration::from_secs(10800), true);
         assert_matches(
             r#"{"cache":{"seconds":10800.0,"loosereload":true},"items":[]}"#,
@@ -167,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_simple_item() -> Result<()> {
-        let mut response = Response::new();
+        let mut response = Response::default();
         response.items(vec![Item::new("Simple Title")]);
         assert_matches(r#"{"items":[{"title":"Simple Title"}]}"#, response)
     }
