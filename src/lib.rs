@@ -12,7 +12,7 @@ mod workflow_config;
 
 pub use clipboard::copy_markdown_link_to_clipboard;
 pub use clipboard::copy_rich_text_link_to_clipboard;
-pub use error::{Error, Result, WorkflowError, WorkflowResult};
+pub use error::{DefaultWorkflowError, Error, Result, WorkflowError};
 pub use icon::{Icon, *};
 pub use item::{filter_and_sort_items, Item, Key, Modifier};
 pub use response::Response;

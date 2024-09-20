@@ -1,16 +1,18 @@
 use crate::WorkflowConfig;
 use async_trait::async_trait;
 
-use crate::error::WorkflowResult;
+use crate::error::WorkflowError;
 use crate::{filter_and_sort_items, Item, Response};
 
 pub trait Runnable {
-    fn run(self, workflow: &mut Workflow) -> WorkflowResult;
+    type Error: WorkflowError;
+    fn run(self, workflow: &mut Workflow) -> Result<(), Self::Error>;
 }
 
 #[async_trait]
 pub trait AsyncRunnable {
-    async fn run_async(self, workflow: &mut Workflow) -> WorkflowResult;
+    type Error: WorkflowError;
+    async fn run_async(self, workflow: &mut Workflow) -> Result<(), Self::Error>;
 }
 
 pub struct Workflow {
@@ -41,8 +43,7 @@ impl Workflow {
         match runnable.run(&mut workflow) {
             Ok(_) => {}
             Err(e) => {
-                let error_item = Item::new(format!("Error: {}", e));
-                workflow.prepend_item(error_item);
+                workflow.prepend_item(e.error_item());
             }
         }
 
@@ -71,8 +72,7 @@ impl Workflow {
         match runnable.run_async(&mut workflow).await {
             Ok(_) => {}
             Err(e) => {
-                let error_item = Item::new(format!("Error: {}", e));
-                workflow.prepend_item(error_item);
+                workflow.prepend_item(e.error_item());
             }
         }
 

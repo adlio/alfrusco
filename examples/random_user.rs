@@ -1,4 +1,4 @@
-use alfrusco::{AsyncRunnable, Item, Workflow, WorkflowConfig, WorkflowError, WorkflowResult};
+use alfrusco::{AsyncRunnable, Item, Workflow, WorkflowConfig, WorkflowError};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
@@ -18,7 +18,9 @@ pub async fn main() {
 
 #[async_trait::async_trait]
 impl AsyncRunnable for RandomUserWorkflow {
-    async fn run_async(self, wf: &mut Workflow) -> WorkflowResult {
+    type Error = RandomUserError;
+
+    async fn run_async(self, wf: &mut Workflow) -> Result<(), RandomUserError> {
         match self.name {
             Some(name) => {
                 wf.append_item(Item::new(format!("NAME DEFINED AS: '{}'", name)));
@@ -31,13 +33,8 @@ impl AsyncRunnable for RandomUserWorkflow {
         wf.set_filter_keyword(query.clone());
 
         let url = "https://randomuser.me/api/?inc=gender,name&results=50&seed=alfrusco";
-        let response = reqwest::get(url)
-            .await
-            .map_err(|e| WorkflowError::new(e.to_string()))?;
-        let response: RandomUserResponse = response
-            .json()
-            .await
-            .map_err(|e| WorkflowError::new(e.to_string()))?;
+        let response = reqwest::get(url).await?;
+        let response: RandomUserResponse = response.json().await?;
         wf.append_items(
             response
                 .results
@@ -58,13 +55,13 @@ impl AsyncRunnable for RandomUserWorkflow {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RandomUserResponse {
-    pub results: Vec<Result>,
+    pub results: Vec<RandomUser>,
     pub info: serde_json::Value,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Result {
+pub struct RandomUser {
     pub name: RandomUserName,
 }
 
@@ -74,6 +71,44 @@ pub struct RandomUserName {
     pub title: String,
     pub first: String,
     pub last: String,
+}
+
+#[derive(Debug)]
+pub enum RandomUserError {
+    Reqwest(reqwest::Error),
+    Json(serde_json::Error),
+}
+
+impl From<reqwest::Error> for RandomUserError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::Reqwest(e)
+    }
+}
+
+impl From<serde_json::Error> for RandomUserError {
+    fn from(e: serde_json::Error) -> Self {
+        Self::Json(e)
+    }
+}
+
+impl WorkflowError for RandomUserError {}
+
+impl std::fmt::Display for RandomUserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RandomUserError::Reqwest(e) => write!(f, "Reqwest error: {}", e),
+            RandomUserError::Json(e) => write!(f, "JSON error: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for RandomUserError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            RandomUserError::Reqwest(e) => Some(e),
+            RandomUserError::Json(e) => Some(e),
+        }
+    }
 }
 
 #[cfg(test)]

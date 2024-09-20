@@ -1,4 +1,4 @@
-use alfrusco::{Item, Workflow, WorkflowConfig, WorkflowResult};
+use alfrusco::{DefaultWorkflowError, Item, Workflow, WorkflowConfig};
 
 struct StaticOutputWorkflow {}
 
@@ -9,7 +9,8 @@ pub fn main() {
 }
 
 impl alfrusco::Runnable for StaticOutputWorkflow {
-    fn run(self, wf: &mut Workflow) -> WorkflowResult {
+    type Error = DefaultWorkflowError;
+    fn run(self, wf: &mut Workflow) -> Result<(), DefaultWorkflowError> {
         wf.response.skip_knowledge(true);
         wf.response.append_items(vec![
             Item::new("First Option").subtitle("First Subtitle"),

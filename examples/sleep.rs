@@ -2,7 +2,7 @@ use std::{process::Command, time::Duration};
 
 use clap::Parser;
 
-use alfrusco::{URLItem, Workflow, WorkflowConfig, WorkflowResult};
+use alfrusco::{DefaultWorkflowError, URLItem, Workflow, WorkflowConfig};
 
 #[derive(Parser, Debug)]
 struct SleepCommand {
@@ -17,7 +17,8 @@ pub fn main() {
 }
 
 impl alfrusco::Runnable for SleepCommand {
-    fn run(self, wf: &mut Workflow) -> WorkflowResult {
+    type Error = DefaultWorkflowError;
+    fn run(self, wf: &mut Workflow) -> Result<(), DefaultWorkflowError> {
         wf.response.skip_knowledge(true);
         wf.response.rerun(Duration::from_millis(500));
 

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use alfrusco::{URLItem, Workflow, WorkflowConfig, WorkflowResult};
+use alfrusco::{DefaultWorkflowError, URLItem, Workflow, WorkflowConfig, WorkflowError};
 
 struct URLItemsWorkflow {}
 pub fn main() {
@@ -11,7 +11,8 @@ pub fn main() {
 }
 
 impl alfrusco::Runnable for URLItemsWorkflow {
-    fn run(self, wf: &mut Workflow) -> WorkflowResult {
+    type Error = DefaultWorkflowError;
+    fn run(self, wf: &mut Workflow) -> Result<(), DefaultWorkflowError> {
         wf.response.skip_knowledge(true);
         wf.response.cache(Duration::from_secs(60), true);
         wf.response.append_items(vec![

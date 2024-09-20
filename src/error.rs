@@ -1,4 +1,6 @@
-use std::fmt;
+use std::any::type_name_of_val;
+
+use crate::Item;
 
 #[derive(Debug)]
 pub enum Error {
@@ -11,7 +13,6 @@ pub enum Error {
     MissingEnvVar(String),
 }
 
-pub type WorkflowResult = std::result::Result<(), WorkflowError>;
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl std::fmt::Display for Error {
@@ -78,72 +79,55 @@ impl std::error::Error for Error {
     }
 }
 
-#[derive(Debug)]
-pub struct WorkflowError {
-    message: String,
-}
-
-impl WorkflowError {
-    pub fn new<T: Into<String>>(message: T) -> Self {
-        WorkflowError {
-            message: message.into(),
+pub trait WorkflowError: std::error::Error + std::fmt::Display {
+    fn error_item(&self) -> Item {
+        match self.source() {
+            Some(source) => {
+                let type_name = type_name_of_val(source);
+                Item::new(format!("Error: {}", self)).subtitle(format!("{}", type_name))
+            }
+            None => Item::new(format!("An error occurred: {}", self)),
         }
     }
 }
 
-impl fmt::Display for WorkflowError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
+#[derive(Debug)]
+pub struct DefaultWorkflowError {
+    msg: String,
+}
+
+impl WorkflowError for DefaultWorkflowError {}
+
+impl std::error::Error for DefaultWorkflowError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 }
 
-impl std::error::Error for WorkflowError {}
+impl std::fmt::Display for DefaultWorkflowError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
 
-// Implement From for common error types
-impl From<std::io::Error> for WorkflowError {
+impl From<String> for DefaultWorkflowError {
+    fn from(msg: String) -> Self {
+        DefaultWorkflowError { msg }
+    }
+}
+
+impl From<&str> for DefaultWorkflowError {
+    fn from(msg: &str) -> Self {
+        DefaultWorkflowError {
+            msg: msg.to_string(),
+        }
+    }
+}
+
+impl From<std::io::Error> for DefaultWorkflowError {
     fn from(err: std::io::Error) -> Self {
-        WorkflowError::new(err.to_string())
-    }
-}
-
-impl From<String> for WorkflowError {
-    fn from(err: String) -> Self {
-        WorkflowError::new(err)
-    }
-}
-
-impl From<&str> for WorkflowError {
-    fn from(err: &str) -> Self {
-        WorkflowError::new(err)
-    }
-}
-
-impl From<std::fmt::Error> for WorkflowError {
-    fn from(err: std::fmt::Error) -> WorkflowError {
-        WorkflowError::new(err.to_string())
-    }
-}
-
-impl From<std::string::FromUtf8Error> for WorkflowError {
-    fn from(err: std::string::FromUtf8Error) -> WorkflowError {
-        WorkflowError::new(err.to_string())
-    }
-}
-
-impl From<serde_json::Error> for WorkflowError {
-    fn from(err: serde_json::Error) -> WorkflowError {
-        WorkflowError::new(err.to_string())
-    }
-}
-
-impl From<std::num::ParseIntError> for WorkflowError {
-    fn from(err: std::num::ParseIntError) -> WorkflowError {
-        WorkflowError::new(err.to_string())
-    }
-}
-
-impl From<std::env::VarError> for WorkflowError {
-    fn from(err: std::env::VarError) -> WorkflowError {
-        WorkflowError::new(err.to_string())
+        DefaultWorkflowError {
+            msg: format!("IO Error: {}", err),
+        }
     }
 }
