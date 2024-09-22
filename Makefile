@@ -5,6 +5,7 @@ test:
 
 workflow:
 	cargo build --all-targets --release && \
+	cp target/release/examples/random_user workflow/ && \
 	cp target/release/examples/sleep workflow/ && \
 	cp target/release/examples/url_items workflow/ && \
 	cp target/release/examples/static_output workflow/
