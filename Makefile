@@ -12,6 +12,9 @@ workflow:
 build:
 	cargo build --all-targets --all-features --examples
 
+test:
+	cargo test --all-targets --all-features --examples
+
 release:
 	cargo build --all-targets --all-features --examples --release
 
