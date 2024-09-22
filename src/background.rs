@@ -3,7 +3,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use crate::background_job::BackgroundJob;
-use crate::Workflow;
+use crate::workflow::Workflow;
 
 impl Workflow {
     /// Ensure that a particular command is run at least as often as the
@@ -14,10 +14,9 @@ impl Workflow {
     pub fn run_in_background(&mut self, job_key: &str, max_age: Duration, cmd: Command) {
         let mut job = BackgroundJob::new(self, job_key, max_age, cmd);
         let job_item = job.run();
-        match job_item {
-            Some(item) => self.response.prepend_items(vec![item]),
-            None => (),
-        };
+        if let Some(item) = job_item {
+            self.response.prepend_items(vec![item]);
+        }
     }
 
     /// Returns the path to the cache subdirectory where jobs data is held
