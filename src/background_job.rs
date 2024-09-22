@@ -7,7 +7,8 @@ use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use sysinfo::System;
 
-use crate::{Item, Result, Workflow, ICON_CLOCK};
+use crate::workflow::Workflow;
+use crate::{Item, Result, ICON_CLOCK};
 
 pub type RunDuration = Duration;
 pub type Staleness = Duration;
@@ -157,7 +158,7 @@ impl<'a> BackgroundJob<'a> {
     }
 
     fn job_dir(&self) -> PathBuf {
-        self.workflow.jobs_dir().join(&self.id)
+        self.workflow.jobs_dir().join(self.id)
     }
 
     fn pid_file(&self) -> PathBuf {
@@ -169,12 +170,12 @@ impl<'a> BackgroundJob<'a> {
     }
 
     fn get_pid(&self) -> Result<u32> {
-        let pid = read_to_string(&self.pid_file())?;
+        let pid = read_to_string(self.pid_file())?;
         pid.trim().parse::<u32>().map_err(|e| e.into())
     }
 
     fn save_pid(&self, pid: u32) -> Result<()> {
-        write(&self.pid_file(), pid.to_string())?;
+        write(self.pid_file(), pid.to_string())?;
         Ok(())
     }
 
@@ -183,7 +184,7 @@ impl<'a> BackgroundJob<'a> {
         if !self.pid_file().exists() {
             return Ok(());
         }
-        fs::remove_file(&self.pid_file())?;
+        fs::remove_file(self.pid_file())?;
         Ok(())
     }
 
@@ -192,12 +193,12 @@ impl<'a> BackgroundJob<'a> {
     /// process started, and remove the pid file.
     ///
     fn cleanup(&self) -> Result<()> {
-        match fs::metadata(&self.pid_file()) {
+        match fs::metadata(self.pid_file()) {
             Ok(metadata) => {
                 let last_run_systime = metadata.modified().unwrap();
                 let last_run_date = DateTime::<Utc>::from(last_run_systime);
-                write(&self.last_run_file(), last_run_date.to_rfc3339())?;
-                let dest = File::options().write(true).open(&self.last_run_file())?;
+                write(self.last_run_file(), last_run_date.to_rfc3339())?;
+                let dest = File::options().write(true).open(self.last_run_file())?;
                 let times = FileTimes::new()
                     .set_accessed(last_run_systime)
                     .set_modified(last_run_systime);
