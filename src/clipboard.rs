@@ -1,6 +1,5 @@
-use clap::Parser;
-
 use log::{debug, info};
+use std::env::var;
 use std::process::Command;
 
 use clipboard::ClipboardContext;
@@ -10,46 +9,23 @@ use hex::encode;
 use crate::Response;
 use crate::Result;
 
-#[derive(Parser, Debug)]
-struct ClipboardCli {
-    #[arg(short, long, env)]
-    title: Option<String>,
-
-    #[arg(short, long, env)]
-    url: Option<String>,
-
-    #[arg(short, long, env)]
-    alfrusco_command: Option<String>,
-
-    /// query is not used, but it is necessary to prevent arguments
-    /// supplied to the command from being treated as flags inside
-    /// Alfrusco's clipboard handler
-    query: Vec<String>,
-}
-
 pub fn handle_clipboard() {
-    info!("handle_clipboard checking...");
-    match ClipboardCli::try_parse() {
-        Ok(args) => {
-            if let Some(command) = args.alfrusco_command {
-                if let Some(title) = args.title {
-                    if let Some(url) = args.url {
-                        info!("alfrusco handling clipboard command: {}", command);
-                        if command == "richtext" {
-                            copy_rich_text_link_to_clipboard(title, url);
-                            write_empty_items().unwrap();
-                            std::process::exit(0);
-                        } else if command == "markdown" {
-                            copy_markdown_link_to_clipboard(title, url);
-                            write_empty_items().unwrap();
-                            std::process::exit(0);
-                        }
-                    }
+    let cmd = var("ALFRUSCO_COMMAND").ok();
+    let title = var("TITLE").ok();
+    let url = var("URL").ok();
+    if let Some(cmd) = cmd {
+        debug!("ALFRUSCO_COMMAND provided. Alfrusco will handle this request");
+
+        if cmd == "richtext" || cmd == "markdown" {
+            if let (Some(title), Some(url)) = (title, url) {
+                if cmd == "richtext" {
+                    copy_rich_text_link_to_clipboard(title, url);
+                } else if cmd == "markdown" {
+                    copy_markdown_link_to_clipboard(title, url);
                 }
+                write_empty_items().unwrap();
+                std::process::exit(0);
             }
-        }
-        Err(_) => {
-            debug!("Skipping alfruco handle_clipboard. CLI parse didn't include title, url, or alfrusco_command");
         }
     }
 }
