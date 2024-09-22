@@ -1,7 +1,6 @@
 use crate::{Icon, Item, Key, Modifier};
 use serde::{Deserialize, Serialize};
 
-///
 #[non_exhaustive]
 #[derive(Debug, Default, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct URLItem {
@@ -153,6 +152,8 @@ impl From<URLItem> for Item {
 #[cfg(test)]
 mod tests {
 
+    use crate::Arg;
+
     use super::*;
 
     #[test]
@@ -163,11 +164,65 @@ mod tests {
     }
 
     #[test]
+    fn test_display_title_override() {
+        let item: Item = URLItem::new("Rust", "https://www.rust-lang.org/")
+            .display_title("Rust (Displayed in Alfred UI, but not used in links)")
+            .into();
+        assert_eq!(
+            item.title,
+            "Rust (Displayed in Alfred UI, but not used in links)"
+        );
+    }
+
+    #[test]
     fn test_short_title_override() {
         let url_item = URLItem::new("crates.io: Rust Package Repository", "https://crates.io/")
             .short_title("crates.io");
         assert_eq!(url_item.title, "crates.io: Rust Package Repository");
         assert_eq!(url_item.short_title.unwrap(), "crates.io");
+    }
+
+    #[test]
+    fn test_long_title() {
+        let item: Item = URLItem::new("Rust Blog", "https://blog.rust-lang.org/")
+            .long_title("The Rust Programming Language Blog")
+            .into();
+        assert_eq!(item.title, "Rust Blog");
+        let lm = item.modifiers["cmd+ctrl"].clone();
+        assert_eq!(
+            lm.subtitle,
+            "Copy Markdown Link 'The Rust Programming Language Blog'"
+        );
+        assert_eq!(lm.arg, Some(Arg::One("run".to_string())));
+    }
+
+    #[test]
+    fn test_copy_text() {
+        let item: Item = URLItem::new("Google", "https://www.google.com")
+            .copy_text("www.google.com")
+            .into();
+        assert_eq!(item.title, "Google");
+        assert_eq!(item.text.unwrap().copy, Some("www.google.com".to_string()));
+    }
+
+    #[test]
+    fn test_icon_from_image() {
+        let item: Item = URLItem::new("Adobe PDF", "https://www.adobe.com/acrobat.html")
+            .icon_from_image("/Users/crayons/Documents/acrobat.png")
+            .into();
+        let icon = item.icon.unwrap();
+        assert_eq!(icon.type_, None);
+        assert_eq!(icon.path, "/Users/crayons/Documents/acrobat.png");
+    }
+
+    #[test]
+    fn test_icon_for_filetype() {
+        let item: Item = URLItem::new("Adobe PDF", "https://www.adobe.com/acrobat.html")
+            .icon_for_filetype("com.adobe.pdf")
+            .into();
+        let icon = item.icon.unwrap();
+        assert_eq!(icon.type_.unwrap(), "filetype");
+        assert_eq!(icon.path, "com.adobe.pdf");
     }
 
     #[test]
