@@ -1,11 +1,14 @@
-use alfrusco::{DefaultWorkflowError, Item, Workflow, WorkflowConfig};
+use alfrusco::config;
+use alfrusco::{DefaultWorkflowError, Item, Workflow};
+use clap::Parser;
 
+#[derive(Parser)]
 struct StaticOutputWorkflow {}
 
 pub fn main() {
-    let config = WorkflowConfig::from_env().unwrap();
-    let workflow = StaticOutputWorkflow {};
-    Workflow::execute(config, workflow, &mut std::io::stdout());
+    env_logger::init();
+    let command = StaticOutputWorkflow {};
+    alfrusco::execute(&config::AlfredEnvProvider, command, &mut std::io::stdout());
 }
 
 impl alfrusco::Runnable for StaticOutputWorkflow {
@@ -27,10 +30,10 @@ mod tests {
 
     #[test]
     fn test_static_output_workflow() {
-        let config = WorkflowConfig::for_testing().unwrap();
-        let workflow = StaticOutputWorkflow {};
+        let command = StaticOutputWorkflow {};
         let mut buffer = Vec::new();
-        alfrusco::Workflow::execute(config, workflow, &mut buffer);
+        let dir = tempfile::tempdir().unwrap().into_path();
+        alfrusco::execute(&config::TestingProvider(dir), command, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"First Option\""));
         assert!(output.contains("\"subtitle\":\"First Subtitle\""));

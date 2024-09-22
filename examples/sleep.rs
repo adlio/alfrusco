@@ -1,8 +1,9 @@
 use std::{process::Command, time::Duration};
+use tempfile::tempdir;
 
+use alfrusco::config;
+use alfrusco::{DefaultWorkflowError, URLItem, Workflow};
 use clap::Parser;
-
-use alfrusco::{DefaultWorkflowError, URLItem, Workflow, WorkflowConfig};
 
 #[derive(Parser, Debug)]
 struct SleepCommand {
@@ -11,9 +12,9 @@ struct SleepCommand {
 }
 
 pub fn main() {
+    env_logger::init();
     let command = SleepCommand::parse();
-    let config = WorkflowConfig::from_env().unwrap();
-    Workflow::execute(config, command, &mut std::io::stdout());
+    alfrusco::execute(&config::AlfredEnvProvider, command, &mut std::io::stdout());
 }
 
 impl alfrusco::Runnable for SleepCommand {
@@ -41,12 +42,16 @@ mod tests {
 
     #[test]
     fn test_sleep_workflow() {
-        let config = WorkflowConfig::for_testing().unwrap();
+        let tempdir = tempdir().unwrap();
         let workflow = SleepCommand {
             duration_in_seconds: 5,
         };
         let mut buffer = Vec::new();
-        alfrusco::Workflow::execute(config, workflow, &mut buffer);
+        alfrusco::execute(
+            &config::TestingProvider(tempdir.path().into()),
+            workflow,
+            &mut buffer,
+        );
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"Google\""));
     }

@@ -1,13 +1,16 @@
 use std::time::Duration;
 
-use alfrusco::{DefaultWorkflowError, URLItem, Workflow, WorkflowConfig, WorkflowError};
+use alfrusco::config;
+use alfrusco::{DefaultWorkflowError, URLItem, Workflow};
+use clap::Parser;
 
+#[derive(Parser)]
 struct URLItemsWorkflow {}
+
 pub fn main() {
     env_logger::init();
-    let config = WorkflowConfig::from_env().unwrap();
-    let workflow = URLItemsWorkflow {};
-    Workflow::execute(config, workflow, &mut std::io::stdout());
+    let command = URLItemsWorkflow {};
+    alfrusco::execute(&config::AlfredEnvProvider, command, &mut std::io::stdout());
 }
 
 impl alfrusco::Runnable for URLItemsWorkflow {
@@ -29,10 +32,10 @@ mod tests {
 
     #[test]
     fn test_url_items_workflow() {
-        let config = WorkflowConfig::for_testing().unwrap();
-        let workflow = URLItemsWorkflow {};
+        let command = URLItemsWorkflow {};
+        let dir = tempfile::tempdir().unwrap().into_path();
         let mut buffer = Vec::new();
-        alfrusco::Workflow::execute(config, workflow, &mut buffer);
+        alfrusco::execute(&config::TestingProvider(dir), command, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"DuckDuckGo\""));
         assert!(output.contains("\"cache\":{\"seconds\":60.0,\"loosereload\":true}"));

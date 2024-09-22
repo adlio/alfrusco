@@ -1,4 +1,5 @@
-use alfrusco::{AsyncRunnable, Item, Workflow, WorkflowConfig, WorkflowError};
+use alfrusco::config;
+use alfrusco::{AsyncRunnable, Item, Workflow, WorkflowError};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
@@ -11,9 +12,9 @@ struct RandomUserWorkflow {
 
 #[tokio::main]
 pub async fn main() {
+    env_logger::init();
     let command = RandomUserWorkflow::parse();
-    let config = WorkflowConfig::from_env().unwrap();
-    Workflow::execute_async(config, command, &mut std::io::stdout()).await;
+    alfrusco::execute_async(&config::AlfredEnvProvider, command, &mut std::io::stdout()).await;
 }
 
 #[async_trait::async_trait]
@@ -21,12 +22,9 @@ impl AsyncRunnable for RandomUserWorkflow {
     type Error = RandomUserError;
 
     async fn run_async(self, wf: &mut Workflow) -> Result<(), RandomUserError> {
-        match self.name {
-            Some(name) => {
-                wf.append_item(Item::new(format!("NAME DEFINED AS: '{}'", name)));
-                return Ok(());
-            }
-            None => {}
+        if let Some(name) = self.name {
+            wf.append_item(Item::new(format!("NAME DEFINED AS: '{}'", name)));
+            return Ok(());
         }
 
         let query = self.keyword.join(" ");
@@ -117,13 +115,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_random_user_response() {
-        let config = WorkflowConfig::for_testing().unwrap();
-        let workflow = RandomUserWorkflow {
+        let command = RandomUserWorkflow {
             keyword: vec![],
             name: None,
         };
+
         let mut buffer = Vec::new();
-        alfrusco::Workflow::execute_async(config, workflow, &mut buffer).await;
+        let dir = tempfile::tempdir().unwrap().into_path();
+        alfrusco::execute_async(&config::TestingProvider(dir), command, &mut buffer).await;
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"Mr Fletcher Hall\""));
     }
