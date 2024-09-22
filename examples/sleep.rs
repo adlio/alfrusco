@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn test_sleep_workflow() {
-        let tempdir = tempdir().unwrap();
+        let tempdir = tempfile::tempdir().unwrap();
         let workflow = SleepCommand {
             duration_in_seconds: 5,
         };

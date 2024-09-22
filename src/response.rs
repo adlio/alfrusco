@@ -108,7 +108,18 @@ where
     S: Serializer,
 {
     match duration {
-        Some(duration) => s.serialize_f32(duration.as_secs_f32()),
+        Some(duration) => {
+            let secs = duration.as_secs();
+            let subsec_millis = duration.subsec_millis();
+
+            if subsec_millis == 0 {
+                s.serialize_u64(secs)
+            } else {
+                let millis = secs * 1000 + u64::from(subsec_millis);
+                let seconds = millis as f64 / 1000.0;
+                s.serialize_f64(seconds)
+            }
+        }
         None => s.serialize_none(),
     }
 }
@@ -116,6 +127,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use serde_json::json;
+    use std::time::Duration;
 
     #[test]
     fn test_empty_response() -> Result<()> {
@@ -140,7 +154,7 @@ mod tests {
     fn test_rerun_serialization() -> Result<()> {
         let mut response = Response::default();
         response.rerun(Duration::from_secs(5));
-        assert_matches(r#"{"rerun":5.0,"items":[]}"#, response)
+        assert_matches(r#"{"rerun":5,"items":[]}"#, response)
     }
 
     #[test]
@@ -155,7 +169,7 @@ mod tests {
         let mut response = Response::default();
         response.cache(Duration::from_secs(10800), true);
         assert_matches(
-            r#"{"cache":{"seconds":10800.0,"loosereload":true},"items":[]}"#,
+            r#"{"cache":{"seconds":10800,"loosereload":true},"items":[]}"#,
             response,
         )
     }
@@ -165,6 +179,30 @@ mod tests {
         let mut response = Response::default();
         response.items(vec![Item::new("Simple Title")]);
         assert_matches(r#"{"items":[{"title":"Simple Title"}]}"#, response)
+    }
+
+    #[test]
+    fn test_duration_as_seconds_serialization() {
+        let cases = [
+            (Duration::from_millis(400), "0.4"),
+            (Duration::from_millis(432), "0.432"),
+            (Duration::from_secs(2), "2"),
+            (Duration::from_secs(60), "60"),
+            (Duration::from_secs(300), "300"),
+            (Duration::from_millis(2500), "2.5"),
+        ];
+
+        for (duration, expected) in cases {
+            let result = json!({ "duration": duration_as_seconds(&Some(duration), serde_json::value::Serializer).unwrap() });
+            assert_eq!(
+                result.to_string(),
+                format!(r#"{{"duration":{}}}"#, expected)
+            );
+        }
+
+        let none_duration: Option<Duration> = None;
+        let result = json!({ "duration": duration_as_seconds(&none_duration, serde_json::value::Serializer).unwrap() });
+        assert_eq!(result.to_string(), r#"{"duration":null}"#);
     }
 
     fn assert_matches(expected: &str, response: Response) -> Result<()> {

@@ -37,7 +37,8 @@ mod tests {
         let mut buffer = Vec::new();
         alfrusco::execute(&config::TestingProvider(dir), command, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();
+        println!("URL items: {}", output);
         assert!(output.contains("\"title\":\"DuckDuckGo\""));
-        assert!(output.contains("\"cache\":{\"seconds\":60.0,\"loosereload\":true}"));
+        assert!(output.contains("\"cache\":{\"seconds\":60,\"loosereload\":true}"));
     }
 }
