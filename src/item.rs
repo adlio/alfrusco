@@ -24,24 +24,24 @@ pub enum Key {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Modifier {
     #[serde(skip_serializing)]
-    keys: String,
+    pub keys: String,
 
-    subtitle: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    arg: Option<Arg>,
+    pub subtitle: String,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    icon: Option<Icon>,
+    pub arg: Option<Arg>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    variables: Option<HashMap<String, String>>,
+    pub icon: Option<Icon>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    autocomplete: Option<String>,
+    pub variables: Option<HashMap<String, String>>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    valid: Option<bool>,
+    pub autocomplete: Option<String>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub valid: Option<bool>,
 }
 
 /// Item represents a single choice in the Alfred UI. The fields here
