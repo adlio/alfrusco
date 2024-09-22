@@ -158,9 +158,12 @@ mod tests {
 
     #[test]
     fn test_new_url_item() {
-        let url_item = URLItem::new("Rust", "https://www.rust-lang.org/");
-        assert_eq!(url_item.title, "Rust");
-        assert_eq!(url_item.url, "https://www.rust-lang.org/");
+        let item: Item = URLItem::new("Rust", "https://www.rust-lang.org/").into();
+        assert_eq!(item.title, "Rust");
+        assert_eq!(
+            item.arg,
+            Some(Arg::One("https://www.rust-lang.org/".to_string()))
+        );
     }
 
     #[test]
@@ -176,10 +179,12 @@ mod tests {
 
     #[test]
     fn test_short_title_override() {
-        let url_item = URLItem::new("crates.io: Rust Package Repository", "https://crates.io/")
-            .short_title("crates.io");
-        assert_eq!(url_item.title, "crates.io: Rust Package Repository");
-        assert_eq!(url_item.short_title.unwrap(), "crates.io");
+        let item: Item = URLItem::new("crates.io: Rust Package Repository", "https://crates.io/")
+            .short_title("crates.io")
+            .into();
+        assert_eq!(item.title, "crates.io: Rust Package Repository");
+        let lm = item.modifiers["cmd+shift"].clone();
+        assert_eq!(lm.subtitle, "Copy Markdown Link 'crates.io'");
     }
 
     #[test]
@@ -227,8 +232,7 @@ mod tests {
 
     #[test]
     fn test_into_item() {
-        let url_item = URLItem::new("Rust", "https://www.rust-lang.org/");
-        let item: Item = url_item.into();
+        let item: Item = URLItem::new("Rust", "https://www.rust-lang.org/").into();
         assert_eq!(item.title, "Rust");
     }
 }
