@@ -152,9 +152,8 @@ impl From<URLItem> for Item {
 #[cfg(test)]
 mod tests {
 
-    use crate::Arg;
-
     use super::*;
+    use crate::Arg;
 
     #[test]
     fn test_new_url_item() {
@@ -184,7 +183,10 @@ mod tests {
             .into();
         assert_eq!(item.title, "crates.io: Rust Package Repository");
         let lm = item.modifiers["cmd+shift"].clone();
-        assert_eq!(lm.subtitle, "Copy Markdown Link 'crates.io'");
+        assert_eq!(
+            lm.subtitle,
+            Some("Copy Markdown Link 'crates.io'".to_string())
+        );
     }
 
     #[test]
@@ -196,7 +198,7 @@ mod tests {
         let lm = item.modifiers["cmd+ctrl"].clone();
         assert_eq!(
             lm.subtitle,
-            "Copy Markdown Link 'The Rust Programming Language Blog'"
+            Some("Copy Markdown Link 'The Rust Programming Language Blog'".to_string()),
         );
         assert_eq!(lm.arg, Some(Arg::One("run".to_string())));
     }
