@@ -84,7 +84,7 @@ pub trait WorkflowError: std::error::Error + std::fmt::Display {
         match self.source() {
             Some(source) => {
                 let type_name = type_name_of_val(source);
-                Item::new(format!("Error: {}", self)).subtitle(format!("{}", type_name))
+                Item::new(format!("Error: {}", self)).subtitle(type_name.to_string())
             }
             None => Item::new(format!("An error occurred: {}", self)),
         }

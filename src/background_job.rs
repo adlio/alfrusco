@@ -233,7 +233,7 @@ impl<'a> BackgroundJob<'a> {
     /// since that event occurred. Otherwise, it returns None. We use the file timestamp
     /// on an empty file to determine the last completion time.
     fn get_staleness(&self) -> Option<Staleness> {
-        match fs::metadata(&self.last_run_file()) {
+        match fs::metadata(self.last_run_file()) {
             Ok(metadata) => {
                 let last_run = metadata.modified().unwrap();
                 let duration = SystemTime::now().duration_since(last_run).unwrap();
