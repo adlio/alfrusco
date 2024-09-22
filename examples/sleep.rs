@@ -1,5 +1,4 @@
 use std::{process::Command, time::Duration};
-use tempfile::tempdir;
 
 use alfrusco::config;
 use alfrusco::{DefaultWorkflowError, URLItem, Workflow};
