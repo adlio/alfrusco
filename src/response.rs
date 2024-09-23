@@ -3,8 +3,7 @@ use std::time::Duration;
 
 use serde::{Serialize, Serializer};
 
-use crate::Item;
-use crate::Result;
+use crate::{Item, Result};
 
 /// Represents the contents of a complete Alfred response to an execution.
 ///
@@ -128,10 +127,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
 
     use serde_json::json;
-    use std::time::Duration;
+
+    use super::*;
 
     #[test]
     fn test_empty_response() -> Result<()> {

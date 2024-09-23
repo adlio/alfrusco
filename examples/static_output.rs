@@ -1,5 +1,4 @@
-use alfrusco::config;
-use alfrusco::{DefaultWorkflowError, Item, Workflow};
+use alfrusco::{config, DefaultWorkflowError, Item, Workflow};
 use clap::Parser;
 
 #[derive(Parser)]

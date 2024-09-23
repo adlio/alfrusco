@@ -1,13 +1,11 @@
-use log::{debug, info};
 use std::env::var;
 use std::process::Command;
 
-use clipboard::ClipboardContext;
-use clipboard::ClipboardProvider;
+use clipboard::{ClipboardContext, ClipboardProvider};
 use hex::encode;
+use log::{debug, info};
 
-use crate::Response;
-use crate::Result;
+use crate::{Response, Result};
 
 pub fn handle_clipboard() {
     let cmd = var("ALFRUSCO_COMMAND").ok();

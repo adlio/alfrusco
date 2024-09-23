@@ -1,5 +1,4 @@
-use alfrusco::config;
-use alfrusco::{AsyncRunnable, Item, Workflow, WorkflowError};
+use alfrusco::{config, AsyncRunnable, Item, Workflow, WorkflowError};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 

@@ -1,6 +1,7 @@
-use crate::Result;
 use std::env;
 use std::path::PathBuf;
+
+use crate::Result;
 
 const VAR_PREFERENCES: &str = "alfred_preferences";
 const VAR_PREFERENCES_LOCALHASH: &str = "alfred_preferences_localhash";

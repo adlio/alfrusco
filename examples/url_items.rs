@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use alfrusco::config;
-use alfrusco::{DefaultWorkflowError, URLItem, Workflow};
+use alfrusco::{config, DefaultWorkflowError, URLItem, Workflow};
 use clap::Parser;
 
 #[derive(Parser)]

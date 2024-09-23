@@ -1,4 +1,7 @@
-use crate::{config::WorkflowConfig, error::Result, item::Item, response::Response};
+use crate::config::WorkflowConfig;
+use crate::error::Result;
+use crate::item::Item;
+use crate::response::Response;
 
 /// Workflow represents an active execution of an Alfred workflow.
 ///

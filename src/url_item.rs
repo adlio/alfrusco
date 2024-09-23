@@ -1,5 +1,6 @@
-use crate::{Icon, Item, Key, Modifier};
 use serde::{Deserialize, Serialize};
+
+use crate::{Icon, Item, Key, Modifier};
 
 #[non_exhaustive]
 #[derive(Debug, Default, Clone, PartialEq, Hash, Serialize, Deserialize)]
