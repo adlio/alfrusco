@@ -7,10 +7,11 @@ pub enum Error {
     Io(std::io::Error),
     Fmt(std::fmt::Error),
     FromUtf8(std::string::FromUtf8Error),
-    ParseIntError(std::num::ParseIntError),
+    ParseInt(std::num::ParseIntError),
     Serde(serde_json::Error),
     Var(std::env::VarError),
     MissingEnvVar(String),
+    Workflow(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -21,10 +22,11 @@ impl std::fmt::Display for Error {
             Error::Io(ref err) => write!(f, "IO Error: {}", err),
             Error::Fmt(ref err) => write!(f, "Fmt Error: {}", err),
             Error::FromUtf8(ref err) => write!(f, "FromUtf8 Error: {}", err),
-            Error::ParseIntError(ref err) => write!(f, "ParseIntError: {}", err),
+            Error::ParseInt(ref err) => write!(f, "ParseIntError: {}", err),
             Error::Serde(ref err) => write!(f, "Serde Error: {}", err),
             Error::Var(ref err) => write!(f, "Var Error: {}", err),
             Error::MissingEnvVar(ref var) => write!(f, "Missing environment variable: {}", var),
+            Error::Workflow(ref msg) => write!(f, "Workflow Error: {}", msg),
         }
     }
 }
@@ -55,7 +57,7 @@ impl From<serde_json::Error> for Error {
 
 impl From<std::num::ParseIntError> for Error {
     fn from(err: std::num::ParseIntError) -> Error {
-        Error::ParseIntError(err)
+        Error::ParseInt(err)
     }
 }
 
