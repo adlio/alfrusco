@@ -6,10 +6,12 @@ use serde::{Serialize, Serializer};
 use crate::Item;
 use crate::Result;
 
-/// Represents a complete Alfred response consisting of Items to display in
-/// Alfred's UI and optional configuration settings to control re-running
-/// the workflow, caching, and disabling Alfred's learning of the response
-/// the user selected (skip_knowledge).
+/// Represents the contents of a complete Alfred response to an execution.
+///
+/// It consists of the `.items` to display in Alfred's UI and optional
+/// configuration settings to control re-running the workflow, caching,
+/// and disabling Alfred's learning of the response the user selected
+/// (skip_knowledge).
 ///
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]

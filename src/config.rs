@@ -21,6 +21,7 @@ const VAR_WORKFLOW_KEYWORD: &str = "alfred_workflow_keyword";
 const VAR_DEBUG: &str = "alfred_debug";
 
 /// WorkflowConfig holds the configuration values for the current workflow.
+///
 /// In a real-world scenario, these values are read from environment variables.
 /// The from_env() constructor is the primary way to create a WorkflowConfig.
 ///
@@ -54,9 +55,10 @@ pub trait ConfigProvider {
 }
 
 /// AlfredEnvProvider reads workflow configuration values from environment
-/// variables set by the Alfred process. This provider should be used for
-/// production code paths. It returns an Err if any of the following
-/// required environment variables are not set:
+/// variables set by the Alfred process.
+///
+/// This provider should be used for production code paths. It returns an
+/// Err if any of the following required environment variables are not set:
 ///
 /// alfred_workflow_cache
 /// alfred_workflow_data
@@ -94,11 +96,12 @@ impl ConfigProvider for AlfredEnvProvider {
     }
 }
 
-/// TestingProvider implements a mocking strategy for ConfigProvider. Given
-/// a PathBuf, it returns a WorkflowConfig that will operate inside the
-/// provided directory. It will use workflow_data/ and workflow_cache/
-/// subdirectories within the provided directory. All other required properties
-/// are set to hard-coded test values.
+/// TestingProvider implements a mocking strategy for ConfigProvider.
+///
+/// Given a PathBuf, it returns a WorkflowConfig that will operate
+/// inside the provided directory. It will use workflow_data/ and
+/// workflow_cache/ subdirectories within the provided directory.
+/// All other required properties are set to hard-coded test values.
 ///
 /// Typical usage is based around directories created by the tempfile crate
 ///

@@ -1,11 +1,12 @@
 use crate::{config::WorkflowConfig, error::Result, item::Item, response::Response};
 
-/// Workflow represents an active execution of an Alfred workflow. It maintains
-/// the state of the current Response, and owns the Workflow configuration
-/// information (cache and data directories, versions, workflow names, etc).
-/// This struct is instantiated automatically as part of the
-/// alfrusco::execute_* process, so alfrusco consumers needn't create this
-/// struct from scratch.
+/// Workflow represents an active execution of an Alfred workflow.
+///
+/// It maintains the state of the current Response, and owns the Workflow
+/// configuration information (cache and data directories, versions,
+/// workflow names, etc).  This struct is instantiated automatically as
+/// part of the alfrusco::execute_* process, so alfrusco consumers needn't
+/// create this struct from scratch.
 ///
 #[derive(Debug)]
 pub struct Workflow {
