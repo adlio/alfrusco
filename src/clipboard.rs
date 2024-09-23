@@ -21,18 +21,11 @@ pub fn handle_clipboard() {
                 } else if cmd == "markdown" {
                     copy_markdown_link_to_clipboard(title, url);
                 }
-                write_empty_items().unwrap();
+                Response::new().write(std::io::stdout()).unwrap();
                 std::process::exit(0);
             }
         }
     }
-}
-
-pub fn write_empty_items() -> Result<()> {
-    Response::new_with_items(vec![])
-        .write(std::io::stdout())
-        .unwrap();
-    Ok(())
 }
 
 pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
