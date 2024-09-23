@@ -6,7 +6,6 @@ mod background;
 mod background_job;
 mod clipboard;
 mod error;
-mod icon;
 mod item;
 mod response;
 mod url_item;
@@ -14,16 +13,14 @@ mod workflow;
 
 // Pub re-exports
 pub mod config;
-pub use self::{
-    error::{DefaultWorkflowError, Error, Result, WorkflowError},
-    icon::{Icon, *},
-    item::{Arg, Item, Key, Modifier},
-    response::Response,
-    url_item::URLItem,
-    workflow::Workflow,
-};
-
 use item::filter_and_sort_items;
+
+pub use self::error::{DefaultWorkflowError, Error, Result, WorkflowError};
+pub use self::item::icon::*;
+pub use self::item::{Arg, Icon, Item, Key, Modifier, Text};
+pub use self::response::Response;
+pub use self::url_item::URLItem;
+pub use self::workflow::Workflow;
 
 pub fn handle() {
     clipboard::handle_clipboard()

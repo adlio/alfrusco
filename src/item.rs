@@ -4,50 +4,43 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use serde::Serialize;
 
-use crate::Icon;
+mod arg;
+pub mod icon;
+mod modifiers;
+mod text;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(untagged)]
-pub enum Arg {
-    One(String),
-    Many(Vec<String>),
+pub use arg::Arg;
+pub use icon::Icon;
+pub use modifiers::{Key, Modifier};
+pub use text::Text;
+
+pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
+    let matcher = SkimMatcherV2::default();
+
+    let mut filtered_items: Vec<(Item, i64)> = items
+        .into_iter()
+        .filter_map(|item| {
+            let subtitle = item.subtitle.as_deref().unwrap_or_default();
+            let combined = format!("{} : {}", subtitle, item.title);
+            matcher
+                .fuzzy_match(&combined, &query)
+                .map(|score| (item, score))
+        })
+        .collect();
+
+    // Sort by score in descending order
+    filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+
+    filtered_items.into_iter().map(|(item, _)| item).collect()
 }
 
-pub enum Key {
-    Cmd,
-    Ctrl,
-    Alt,
-    Shift,
-    Fn,
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
-pub struct Modifier {
-    #[serde(skip_serializing)]
-    pub keys: String,
-
-    pub subtitle: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub arg: Option<Arg>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon: Option<Icon>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub variables: Option<HashMap<String, String>>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub autocomplete: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub valid: Option<bool>,
-}
-
-/// Item represents a single choice in the Alfred UI. The fields here
-/// are designed around the Script Filter JSON format defined on
-/// the Alfred web site
+/// Item represents a single choice in the Alfred selection UI.
+///
+/// The fields here are designed around the Script Filter JSON format defined
+/// on the Alfred web site:
+///
 /// (https://www.alfredapp.com/help/workflows/inputs/script-filter/json/).
+///
 /// Fields here include all current features, but the struct is marked
 /// non-exhaustive to allow for future expansion of the Alfred JSON format.
 /// Builder functions are provided for each field to allow for easy
@@ -182,98 +175,100 @@ impl Item {
     }
 }
 
-impl std::fmt::Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        match self {
-            Key::Cmd => write!(f, "cmd"),
-            Key::Ctrl => write!(f, "ctrl"),
-            Key::Alt => write!(f, "alt"),
-            Key::Shift => write!(f, "shift"),
-            Key::Fn => write!(f, "fn"),
-        }
-    }
-}
+#[cfg(test)]
+mod tests {
 
-impl Modifier {
-    pub fn new(key: Key) -> Self {
-        Self {
-            keys: format!("{}", key),
-            ..Self::default()
-        }
-    }
+    use serde_json::json;
 
-    pub fn new_combo(keys: &[Key]) -> Self {
-        Self {
-            keys: keys
-                .iter()
-                .map(|key| format!("{}", key))
-                .collect::<Vec<String>>()
-                .join("+"),
-            ..Self::default()
-        }
+    use super::*;
+    use crate::ICON_TOOLBAR_FAVORITES;
+
+    #[test]
+    fn test_arg() {
+        let item = Item::new("Item").arg("singlearg");
+        let json = serde_json::to_value(&item).unwrap();
+        let expected = json!({
+            "title": "Item",
+            "arg": "singlearg"
+        });
+        assert_eq!(json, expected);
     }
 
-    pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
-        self.subtitle = subtitle.into();
-        self
+    #[test]
+    fn test_args() {
+        let item = Item::new("Item").args(["arg1", "arg2", "https://www.google.com"]);
+        let json = serde_json::to_value(&item).unwrap();
+        let expected = json!({
+            "title": "Item",
+            "arg": ["arg1", "arg2", "https://www.google.com"]
+        });
+        assert_eq!(json, expected);
     }
 
-    pub fn arg(mut self, arg: impl Into<String>) -> Self {
-        self.arg = Some(Arg::One(arg.into()));
-        self
+    #[test]
+    fn test_matches() {
+        let item = Item::new("Item").matches("realitemname");
+        let json = serde_json::to_value(&item).unwrap();
+        let expected = json!({
+                    "title": "Item",
+                    "match": "realitemname"
+        });
+        assert_eq!(json, expected);
     }
 
-    pub fn args(mut self, args: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        self.arg = Some(Arg::Many(args.into_iter().map(Into::into).collect()));
-        self
+    #[test]
+    fn test_copy_text() {
+        let item = Item::new("Google").copy_text("www.google.com");
+        assert_eq!(item.title, "Google");
+        assert_eq!(item.text.unwrap().copy, Some("www.google.com".to_string()));
     }
 
-    pub fn var(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.variables
-            .get_or_insert(HashMap::new())
-            .insert(key.into(), value.into());
-        self
+    #[test]
+    fn test_quicklook_url() {
+        let item = Item::new("Google").quicklook_url("https://www.google.com");
+        assert_eq!(item.title, "Google");
+        assert_eq!(
+            item.quicklook_url,
+            Some("https://www.google.com".to_string())
+        );
     }
 
-    pub fn autocomplete(mut self, autocomplete: impl Into<String>) -> Self {
-        self.autocomplete = Some(autocomplete.into());
-        self
+    #[test]
+    fn test_large_type_text() {
+        let item = Item::new("Google").large_type_text("www.google.com");
+        assert_eq!(item.title, "Google");
+        assert_eq!(
+            item.text.unwrap().large_type,
+            Some("www.google.com".to_string())
+        );
     }
 
-    pub fn valid(mut self, valid: bool) -> Self {
-        self.valid = Some(valid);
-        self
+    #[test]
+    fn test_icon_from_string() {
+        let modifier = Item::new("Favorite").icon(ICON_TOOLBAR_FAVORITES.into());
+        let json = serde_json::to_value(&modifier).unwrap();
+        let expected = json!({
+            "title": "Favorite",
+            "icon": {
+                "path": ICON_TOOLBAR_FAVORITES,
+            }
+        });
+        assert_eq!(json, expected);
     }
-}
 
-/// Text defines the two text options for an Alfred Item. copy is the text
-/// that is copied to the clipboard when the user pressed CMD-C.largetype
-/// is the text that is displayed in large type when the user pressed CMD-:.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize)]
-pub struct Text {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) copy: Option<String>,
+    #[test]
+    fn test_icon_from_image() {
+        let item = Item::new("Adobe PDF").icon_from_image("/Users/crayons/Documents/acrobat.png");
+        let icon = item.icon.unwrap();
+        assert_eq!(icon.type_, None);
+        assert_eq!(icon.path, "/Users/crayons/Documents/acrobat.png");
+    }
 
-    #[serde(rename = "largetype", skip_serializing_if = "Option::is_none")]
-    pub(crate) large_type: Option<String>,
-}
-
-pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
-    let matcher = SkimMatcherV2::default();
-
-    let mut filtered_items: Vec<(Item, i64)> = items
-        .into_iter()
-        .filter_map(|item| {
-            let subtitle = item.subtitle.as_deref().unwrap_or_default();
-            let combined = format!("{} : {}", subtitle, item.title);
-            matcher
-                .fuzzy_match(&combined, &query)
-                .map(|score| (item, score))
-        })
-        .collect();
-
-    // Sort by score in descending order
-    filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-
-    filtered_items.into_iter().map(|(item, _)| item).collect()
+    #[test]
+    fn test_icon_for_filetype() {
+        let item = Item::new("Adobe PDF").icon_for_filetype("com.adobe.pdf");
+        let icon = item.icon.unwrap();
+        assert_eq!(icon.type_.unwrap(), "filetype");
+        assert_eq!(icon.path, "com.adobe.pdf");
+    }
 }
