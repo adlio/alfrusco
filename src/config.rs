@@ -136,3 +136,27 @@ impl ConfigProvider for TestingProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_alfred_env_provider_with_errors() {
+        let provider = AlfredEnvProvider;
+        let result = provider.config();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_testing_provider() {
+        let dir = tempfile::tempdir().unwrap().into_path();
+        let provider = TestingProvider(dir);
+        let config = provider.config().unwrap();
+        assert_eq!(config.workflow_bundleid, "com.alfredapp.googlesuggest");
+        assert_eq!(config.workflow_name, "Test Workflow");
+        assert_eq!(config.version, "5.0");
+        assert_eq!(config.version_build, "2058");
+    }
+}
