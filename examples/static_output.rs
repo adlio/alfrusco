@@ -1,4 +1,4 @@
-use alfrusco::{config, DefaultWorkflowError, Item, Workflow};
+use alfrusco::{config, Item, Workflow};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -11,8 +11,8 @@ pub fn main() {
 }
 
 impl alfrusco::Runnable for StaticOutputWorkflow {
-    type Error = DefaultWorkflowError;
-    fn run(self, wf: &mut Workflow) -> Result<(), DefaultWorkflowError> {
+    type Error = alfrusco::Error;
+    fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         wf.response.skip_knowledge(true);
         wf.response.append_items(vec![
             Item::new("First Option").subtitle("First Subtitle"),

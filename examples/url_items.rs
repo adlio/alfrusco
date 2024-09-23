@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use alfrusco::{config, DefaultWorkflowError, URLItem, Workflow};
+use alfrusco::{config, URLItem, Workflow};
 use clap::Parser;
 
 #[derive(Parser)]
@@ -13,8 +13,8 @@ pub fn main() {
 }
 
 impl alfrusco::Runnable for URLItemsWorkflow {
-    type Error = DefaultWorkflowError;
-    fn run(self, wf: &mut Workflow) -> Result<(), DefaultWorkflowError> {
+    type Error = alfrusco::Error;
+    fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         wf.response.skip_knowledge(true);
         wf.response.cache(Duration::from_secs(60), true);
         wf.response.append_items(vec![

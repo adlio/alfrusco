@@ -71,10 +71,11 @@ impl std::error::Error for Error {
             Error::Io(ref err) => Some(err),
             Error::Fmt(ref err) => Some(err),
             Error::FromUtf8(ref err) => Some(err),
-            Error::ParseIntError(ref err) => Some(err),
+            Error::ParseInt(ref err) => Some(err),
             Error::Serde(ref err) => Some(err),
             Error::Var(ref err) => Some(err),
             Error::MissingEnvVar(_) => None,
+            Error::Workflow(_) => None,
         }
     }
 }
@@ -91,43 +92,6 @@ pub trait WorkflowError: std::error::Error + std::fmt::Display {
     }
 }
 
-#[derive(Debug)]
-pub struct DefaultWorkflowError {
-    msg: String,
-}
-
-impl WorkflowError for DefaultWorkflowError {}
-
-impl std::error::Error for DefaultWorkflowError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-}
-
-impl std::fmt::Display for DefaultWorkflowError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.msg)
-    }
-}
-
-impl From<String> for DefaultWorkflowError {
-    fn from(msg: String) -> Self {
-        DefaultWorkflowError { msg }
-    }
-}
-
-impl From<&str> for DefaultWorkflowError {
-    fn from(msg: &str) -> Self {
-        DefaultWorkflowError {
-            msg: msg.to_string(),
-        }
-    }
-}
-
-impl From<std::io::Error> for DefaultWorkflowError {
-    fn from(err: std::io::Error) -> Self {
-        DefaultWorkflowError {
-            msg: format!("IO Error: {}", err),
-        }
-    }
+impl WorkflowError for Error {
+    // Default implementation is sufficient
 }

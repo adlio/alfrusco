@@ -15,7 +15,7 @@ mod workflow;
 pub mod config;
 use item::filter_and_sort_items;
 
-pub use self::error::{DefaultWorkflowError, Error, Result, WorkflowError};
+pub use self::error::{Error, Result, WorkflowError};
 pub use self::item::icon::*;
 pub use self::item::{Arg, Icon, Item, Key, Modifier, Text};
 pub use self::response::Response;
