@@ -46,6 +46,11 @@ pub struct CacheSettings {
 }
 
 impl Response {
+    // Creates a new, empty Alfred response with an empty vec of Items.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Creates a new Alfred response with the provided Vec of Items.
     pub fn new_with_items(items: Vec<Item>) -> Self {
         Self {
