@@ -144,9 +144,39 @@ mod tests {
 
     #[test]
     fn test_alfred_env_provider_with_errors() {
-        let provider = AlfredEnvProvider;
-        let result = provider.config();
-        assert!(result.is_err());
+        temp_env::with_vars(
+            [
+                (VAR_DEBUG, Some("true")),
+                (VAR_WORKFLOW_CACHE, None),
+                (VAR_WORKFLOW_DATA, None),
+            ],
+            || {
+                let provider = AlfredEnvProvider;
+                let result = provider.config();
+                assert!(result.is_err(), "{:?}", result);
+            },
+        );
+    }
+
+    #[test]
+    fn test_alfred_env_provider_with_required_envvars() {
+        temp_env::with_vars(
+            [
+                (VAR_WORKFLOW_CACHE, Some("/made/up/cache_dir")),
+                (VAR_WORKFLOW_DATA, Some("/made/up/data_dir")),
+                (VAR_WORKFLOW_BUNDLEID, Some("com.alfredapp.googlesuggest")),
+                (VAR_VERSION, Some("5.0")),
+                (VAR_VERSION_BUILD, Some("2058")),
+                (VAR_WORKFLOW_NAME, Some("Test Workflow")),
+                (VAR_WORKFLOW_VERSION, Some("1.7")),
+                (VAR_DEBUG, Some("true")),
+            ],
+            || {
+                let provider = AlfredEnvProvider;
+                let result = provider.config();
+                assert!(result.is_ok(), "{:?}", result);
+            },
+        );
     }
 
     #[test]
