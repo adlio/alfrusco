@@ -18,11 +18,12 @@ log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0"
-tokio = { version = "1", features = ["full"]}
+tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 # Clap is used in examples/
-clap = { version = "4", features = ["derive", "env"]}
+clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0", features = ["json"] }
+temp-env = "0.3"
 tempfile = "3"
 tokio = { version = "1", features = ["full", "test-util"] }
