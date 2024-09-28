@@ -91,7 +91,8 @@ impl<'a> BackgroundJob<'a> {
                                 format_duration(staleness),
                                 format_duration(duration)
                             ))
-                            .icon(ICON_CLOCK.into());
+                            .icon(ICON_CLOCK.into())
+                            .valid(false);
                         Some(stale_item)
                     }
                     None => {
@@ -105,7 +106,8 @@ impl<'a> BackgroundJob<'a> {
                                 "Job is stale, running for {}",
                                 format_duration(duration)
                             ))
-                            .icon(ICON_CLOCK.into());
+                            .icon(ICON_CLOCK.into())
+                            .valid(false);
                         Some(stale_item)
                     }
                 },
