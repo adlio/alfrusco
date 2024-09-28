@@ -58,6 +58,14 @@ impl Workflow {
     pub fn append_item(&mut self, item: Item) {
         self.response.append_items(vec![item]);
     }
+
+    pub fn data_dir(&self) -> &std::path::Path {
+        &self.config.workflow_data
+    }
+
+    pub fn cache_dir(&self) -> &std::path::Path {
+        &self.config.workflow_cache
+    }
 }
 
 #[cfg(test)]
