@@ -15,6 +15,7 @@ impl Workflow {
         let mut job = BackgroundJob::new(self, job_key, max_age, cmd);
         let job_item = job.run();
         if let Some(item) = job_item {
+            self.response.rerun(Duration::from_secs(1));
             self.response.prepend_items(vec![item]);
         }
     }
