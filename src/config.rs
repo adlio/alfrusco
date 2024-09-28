@@ -35,8 +35,8 @@ pub struct WorkflowConfig {
     pub version: String,
     pub version_build: String,
     pub workflow_name: String,
-    pub workflow_version: String,
 
+    pub workflow_version: Option<String>,
     pub preferences: Option<String>,
     pub preferences_localhash: Option<String>,
     pub theme: Option<String>,
@@ -72,16 +72,45 @@ impl ConfigProvider for AlfredEnvProvider {
         let debug = debug == "1" || debug.to_lowercase() == "true";
 
         let config = WorkflowConfig {
-            // Required configuration values. Return Err if missing
-            workflow_bundleid: env::var(VAR_WORKFLOW_BUNDLEID)?,
-            workflow_cache: env::var(VAR_WORKFLOW_CACHE)?.into(),
-            workflow_data: env::var(VAR_WORKFLOW_DATA)?.into(),
-            version: env::var(VAR_VERSION)?,
-            version_build: env::var(VAR_VERSION_BUILD)?,
-            workflow_name: env::var(VAR_WORKFLOW_NAME)?,
-            workflow_version: env::var(VAR_WORKFLOW_VERSION)?,
-
-            // Optional configuration values. Set to blank defaults if not provided
+            // Required configuration values. Return Err with specific message if missing
+            workflow_bundleid: env::var(VAR_WORKFLOW_BUNDLEID).map_err(|_| {
+                format!(
+                    "Missing required environment variable: {}",
+                    VAR_WORKFLOW_BUNDLEID
+                )
+            })?,
+            workflow_cache: env::var(VAR_WORKFLOW_CACHE)
+                .map_err(|_| {
+                    format!(
+                        "Missing required environment variable: {}",
+                        VAR_WORKFLOW_CACHE
+                    )
+                })?
+                .into(),
+            workflow_data: env::var(VAR_WORKFLOW_DATA)
+                .map_err(|_| {
+                    format!(
+                        "Missing required environment variable: {}",
+                        VAR_WORKFLOW_DATA
+                    )
+                })?
+                .into(),
+            version: env::var(VAR_VERSION)
+                .map_err(|_| format!("Missing required environment variable: {}", VAR_VERSION))?,
+            version_build: env::var(VAR_VERSION_BUILD).map_err(|_| {
+                format!(
+                    "Missing required environment variable: {}",
+                    VAR_VERSION_BUILD
+                )
+            })?,
+            workflow_name: env::var(VAR_WORKFLOW_NAME).map_err(|_| {
+                format!(
+                    "Missing required environment variable: {}",
+                    VAR_WORKFLOW_NAME
+                )
+            })?,
+            // Optional configuration values. Set to None if not provided
+            workflow_version: env::var(VAR_WORKFLOW_VERSION).ok(),
             preferences: env::var(VAR_PREFERENCES).ok(),
             preferences_localhash: env::var(VAR_PREFERENCES_LOCALHASH).ok(),
             theme: env::var(VAR_THEME).ok(),
@@ -129,7 +158,7 @@ impl ConfigProvider for TestingProvider {
             workflow_description: Some(
                 "The description of the workflow we use for testing".to_string(),
             ),
-            workflow_version: "1.7".to_string(),
+            workflow_version: Some("1.7".to_string()),
             workflow_uid: Some("user.workflow.B0AC54EC-601C-479A-9428-01F9FD732959".to_string()),
             workflow_keyword: None,
             debug: true,
