@@ -67,6 +67,18 @@ impl From<std::env::VarError> for Error {
     }
 }
 
+impl From<String> for Error {
+    fn from(msg: String) -> Error {
+        Error::Workflow(msg)
+    }
+}
+
+impl From<&str> for Error {
+    fn from(msg: &str) -> Error {
+        Error::Workflow(msg.to_string())
+    }
+}
+
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
