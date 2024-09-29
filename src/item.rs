@@ -116,6 +116,11 @@ impl Item {
         self
     }
 
+    pub fn unset_var(mut self, key: impl Into<String>) -> Self {
+        self.variables.remove(&key.into());
+        self
+    }
+
     pub fn uid(mut self, uid: impl Into<String>) -> Self {
         self.uid = Some(uid.into());
         self
