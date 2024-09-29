@@ -1,6 +1,6 @@
 [package]
 name = "alfrusco"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Utilities for building Alfred workflows with Rust."
 license = "MIT"
