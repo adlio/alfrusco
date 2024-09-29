@@ -83,6 +83,9 @@ pub struct Item {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) text: Option<Text>,
+
+    #[serde(skip_serializing)]
+    pub(crate) sticky: bool,
 }
 
 impl Item {
@@ -171,6 +174,11 @@ impl Item {
 
     pub fn large_type_text(mut self, text: impl Into<String>) -> Self {
         self.text.get_or_insert_with(Text::default).large_type = Some(text.into());
+        self
+    }
+
+    pub fn sticky(mut self, is_sticky: bool) -> Self {
+        self.sticky = is_sticky;
         self
     }
 }
