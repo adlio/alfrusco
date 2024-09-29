@@ -6,6 +6,7 @@ use crate::{Icon, Item, Key, Modifier};
 #[derive(Debug, Default, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct URLItem {
     title: String,
+    subtitle: Option<String>,
     url: String,
     short_title: Option<String>,
     long_title: Option<String>,
@@ -21,6 +22,11 @@ impl URLItem {
             url: url.into(),
             ..Self::default()
         }
+    }
+
+    pub fn subtitle(mut self, subtitle: impl Into<String>) -> Self {
+        self.subtitle = Some(subtitle.into());
+        self
     }
 
     pub fn short_title(mut self, short_title: impl Into<String>) -> Self {
@@ -93,6 +99,10 @@ impl From<URLItem> for Item {
             .valid(true)
             .modifier(cmd_mod)
             .modifier(alt_mod);
+
+        if url_item.subtitle.is_some() {
+            item = item.subtitle(url_item.subtitle.unwrap());
+        }
 
         if url_item.icon.is_some() {
             item = item.icon(url_item.icon.unwrap());
