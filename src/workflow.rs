@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::config::WorkflowConfig;
 use crate::error::Result;
 use crate::item::Item;
@@ -59,12 +61,12 @@ impl Workflow {
         self.response.append_items(vec![item]);
     }
 
-    pub fn data_dir(&self) -> &std::path::Path {
-        &self.config.workflow_data
+    pub fn data_dir(&self) -> PathBuf {
+        self.config.workflow_data.clone()
     }
 
-    pub fn cache_dir(&self) -> &std::path::Path {
-        &self.config.workflow_cache
+    pub fn cache_dir(&self) -> PathBuf {
+        self.config.workflow_cache.clone()
     }
 }
 
