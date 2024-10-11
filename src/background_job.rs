@@ -218,7 +218,7 @@ impl<'a> BackgroundJob<'a> {
     ///
     fn get_running_duration(&self) -> Option<Duration> {
         let mut system = System::new_all();
-        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
         let pid = self.get_pid();
         match pid {
