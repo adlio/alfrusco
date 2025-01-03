@@ -61,6 +61,10 @@ impl Workflow {
         self.response.append_items(vec![item]);
     }
 
+    pub fn skip_knowledge(&mut self, skip: bool) {
+        self.response.skip_knowledge(skip);
+    }
+
     pub fn data_dir(&self) -> PathBuf {
         self.config.workflow_data.clone()
     }
