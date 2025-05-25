@@ -1,9 +1,4 @@
-.PHONY: build build-examples test coverage workflow
-
-test:
-	cargo test --all-targets --all-features
-
-workflow:
+workflow: release
 	cargo build --all-targets --release && \
 	cp target/release/examples/random_user workflow/ && \
 	cp target/release/examples/sleep workflow/ && \
@@ -19,14 +14,34 @@ test:
 release:
 	cargo build --all-targets --all-features --examples --release
 
-static_output_example: build
-	./target/debug/examples/static_output
+clean:
+	cargo clean
+	cargo llvm-cov clean --workspace
 
-target/debug/examples/url_items: build
-url_items_example: target/debug/examples/url_items	
-	alfred_workflow_data=./test_workflow/workflow_data && \
-	alfred_workflow_cache=./test_workflow/workflow_cache && \
-	./target/debug/examples/url_items example | jq
+coverage: check-llvm-cov
+	cargo llvm-cov --all-features --workspace
 
-coverage:
-	cargo tarpaulin --all-targets --all-features --examples --exclude-files tests/* --out Html
+coverage-html: check-llvm-cov
+	cargo llvm-cov --all-features --workspace --html --open
+
+coverage-ci: check-llvm-cov
+	cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+
+check-llvm-cov:
+	@command -v cargo-llvm-cov >/dev/null 2>&1 || { echo "cargo-llvm-cov is not installed. Install it with: cargo install cargo-llvm-cov"; exit 1; }
+
+fmt:
+	cargo +nightly fmt --all
+
+fmt-check:
+	cargo +nightly fmt --all -- --check
+
+clippy:
+	cargo clippy --all-targets --all-features -- -D warnings
+
+clippy-fix:
+	cargo clippy --all-targets --all-features --fix -- -D warnings
+
+lint: fmt clippy-fix
+
+.PHONY: all test clean coverage coverage-html coverage-ci check-llvm-cov release fmt fmt-check clippy clippy-fix lint
