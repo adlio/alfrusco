@@ -1,5 +1,4 @@
 use std::env::var;
-use std::io::Write;
 use std::process::Command;
 
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -89,7 +88,6 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
     use temp_env::with_vars;
     
     #[test]
