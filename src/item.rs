@@ -186,6 +186,11 @@ impl Item {
         self.sticky = is_sticky;
         self
     }
+    
+    #[cfg(test)]
+    pub(crate) fn test_helper_get_sticky(&self) -> bool {
+        self.sticky
+    }
 }
 
 #[cfg(test)]
@@ -283,5 +288,112 @@ mod tests {
         let icon = item.icon.unwrap();
         assert_eq!(icon.type_.unwrap(), "filetype");
         assert_eq!(icon.path, "com.adobe.pdf");
+    }
+    
+    #[test]
+    fn test_var_and_unset_var() {
+        // First, add a variable
+        let item = Item::new("Test Item")
+            .var("key1", "value1")
+            .var("key2", "value2");
+        
+        // Verify both variables are set
+        assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
+        assert_eq!(item.variables.get("key2"), Some(&"value2".to_string()));
+        
+        // Now unset one variable
+        let item = item.unset_var("key1");
+        
+        // Verify key1 is removed but key2 remains
+        assert_eq!(item.variables.get("key1"), None);
+        assert_eq!(item.variables.get("key2"), Some(&"value2".to_string()));
+    }
+    
+    #[test]
+    fn test_unset_var_nonexistent_key() {
+        // Create an item with one variable
+        let item = Item::new("Test Item").var("key1", "value1");
+        
+        // Verify the variable is set
+        assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
+        
+        // Try to unset a variable that doesn't exist
+        let item = item.unset_var("nonexistent_key");
+        
+        // Verify the original variable is still there
+        assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
+        
+        // Verify the HashMap size hasn't changed
+        assert_eq!(item.variables.len(), 1);
+    }
+    
+    #[test]
+    fn test_var_and_unset_var_serialization() {
+        // Create an item with variables
+        let item = Item::new("Test Item")
+            .var("key1", "value1")
+            .var("key2", "value2");
+        
+        // Serialize to JSON
+        let json = serde_json::to_value(&item).unwrap();
+        
+        // Verify variables are included in the JSON
+        let expected = json!({
+            "title": "Test Item",
+            "variables": {
+                "key1": "value1",
+                "key2": "value2"
+            }
+        });
+        assert_eq!(json, expected);
+        
+        // Unset a variable
+        let item = item.unset_var("key1");
+        
+        // Serialize to JSON again
+        let json = serde_json::to_value(&item).unwrap();
+        
+        // Verify the updated variables are in the JSON
+        let expected = json!({
+            "title": "Test Item",
+            "variables": {
+                "key2": "value2"
+            }
+        });
+        assert_eq!(json, expected);
+        
+        // Unset the last variable
+        let item = item.unset_var("key2");
+        
+        // Serialize to JSON again
+        let json = serde_json::to_value(&item).unwrap();
+        
+        // Verify variables field is omitted when empty
+        let expected = json!({
+            "title": "Test Item"
+        });
+        assert_eq!(json, expected);
+    }
+    
+    #[test]
+    fn test_sticky() {
+        // Default should be false
+        let item = Item::new("Test Item");
+        assert!(!item.test_helper_get_sticky());
+        
+        // Set to true
+        let item = item.sticky(true);
+        assert!(item.test_helper_get_sticky());
+        
+        // Set back to false
+        let item = item.sticky(false);
+        assert!(!item.test_helper_get_sticky());
+        
+        // Verify sticky is not serialized (it's marked with skip_serializing)
+        let json = serde_json::to_value(&item).unwrap();
+        let expected = json!({
+            "title": "Test Item"
+        });
+        assert_eq!(json, expected);
     }
 }
