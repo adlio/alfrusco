@@ -46,11 +46,7 @@ mod tests {
             duration_in_seconds: 5,
         };
         let mut buffer = Vec::new();
-        alfrusco::execute(
-            &config::TestingProvider(tempdir),
-            workflow,
-            &mut buffer,
-        );
+        alfrusco::execute(&config::TestingProvider(tempdir), workflow, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"Google\""));
     }

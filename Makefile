@@ -37,10 +37,10 @@ fmt-check:
 	cargo +nightly fmt --all -- --check
 
 clippy:
-	cargo clippy --all-targets --all-features -- -D warnings
+	cargo clippy --all-targets --all-features --examples -- -D warnings
 
 clippy-fix:
-	cargo clippy --all-targets --all-features --fix -- -D warnings
+	cargo clippy --all-targets --all-features --examples --fix -- -D warnings
 
 lint: fmt clippy-fix
 

@@ -201,10 +201,7 @@ mod tests {
 
         for (duration, expected) in cases {
             let result = json!({ "duration": duration_as_seconds(&Some(duration), serde_json::value::Serializer).unwrap() });
-            assert_eq!(
-                result.to_string(),
-                format!(r#"{{"duration":{expected}}}"#)
-            );
+            assert_eq!(result.to_string(), format!(r#"{{"duration":{expected}}}"#));
         }
 
         let none_duration: Option<Duration> = None;

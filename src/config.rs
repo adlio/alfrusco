@@ -74,35 +74,23 @@ impl ConfigProvider for AlfredEnvProvider {
         let config = WorkflowConfig {
             // Required configuration values. Return Err with specific message if missing
             workflow_bundleid: env::var(VAR_WORKFLOW_BUNDLEID).map_err(|_| {
-                format!(
-                    "Missing required environment variable: {VAR_WORKFLOW_BUNDLEID}"
-                )
+                format!("Missing required environment variable: {VAR_WORKFLOW_BUNDLEID}")
             })?,
             workflow_cache: env::var(VAR_WORKFLOW_CACHE)
                 .map_err(|_| {
-                    format!(
-                        "Missing required environment variable: {VAR_WORKFLOW_CACHE}"
-                    )
+                    format!("Missing required environment variable: {VAR_WORKFLOW_CACHE}")
                 })?
                 .into(),
             workflow_data: env::var(VAR_WORKFLOW_DATA)
-                .map_err(|_| {
-                    format!(
-                        "Missing required environment variable: {VAR_WORKFLOW_DATA}"
-                    )
-                })?
+                .map_err(|_| format!("Missing required environment variable: {VAR_WORKFLOW_DATA}"))?
                 .into(),
             version: env::var(VAR_VERSION)
                 .map_err(|_| format!("Missing required environment variable: {VAR_VERSION}"))?,
             version_build: env::var(VAR_VERSION_BUILD).map_err(|_| {
-                format!(
-                    "Missing required environment variable: {VAR_VERSION_BUILD}"
-                )
+                format!("Missing required environment variable: {VAR_VERSION_BUILD}")
             })?,
             workflow_name: env::var(VAR_WORKFLOW_NAME).map_err(|_| {
-                format!(
-                    "Missing required environment variable: {VAR_WORKFLOW_NAME}"
-                )
+                format!("Missing required environment variable: {VAR_WORKFLOW_NAME}")
             })?,
             // Optional configuration values. Set to None if not provided
             workflow_version: env::var(VAR_WORKFLOW_VERSION).ok(),
