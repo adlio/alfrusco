@@ -248,4 +248,29 @@ mod tests {
         let item: Item = URLItem::new("Rust", "https://www.rust-lang.org/").into();
         assert_eq!(item.title, "Rust");
     }
+    
+    #[test]
+    fn test_subtitle() {
+        let url_item = URLItem::new("Rust", "https://www.rust-lang.org/")
+            .subtitle("The Rust Programming Language");
+        
+        // Verify the subtitle is set correctly in the URLItem
+        assert_eq!(url_item.subtitle, Some("The Rust Programming Language".to_string()));
+        
+        // Verify the subtitle is preserved when converted to Item
+        let item: Item = url_item.into();
+        assert_eq!(item.subtitle, Some("The Rust Programming Language".to_string()));
+    }
+
+    #[test]
+    fn test_subtitle_override() {
+        // Test that the subtitle method overrides the default URL subtitle
+        let item: Item = URLItem::new("Rust", "https://www.rust-lang.org/")
+            .subtitle("The Rust Programming Language")
+            .into();
+        
+        // The subtitle should be the one we set, not the URL
+        assert_eq!(item.subtitle, Some("The Rust Programming Language".to_string()));
+        assert_ne!(item.subtitle, Some("https://www.rust-lang.org/".to_string()));
+    }
 }
