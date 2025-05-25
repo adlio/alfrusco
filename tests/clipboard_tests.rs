@@ -1,6 +1,6 @@
 use std::env;
 
-use alfrusco::clipboard::{copy_markdown_link_to_clipboard, copy_rich_text_link_to_clipboard};
+use alfrusco::clipboard::{copy_markdown_link_to_clipboard, copy_rich_text_link_to_clipboard, handle_clipboard_internal};
 
 #[test]
 fn test_copy_markdown_link_to_clipboard() {
@@ -22,7 +22,7 @@ fn test_copy_rich_text_link_to_clipboard() {
 }
 
 #[test]
-fn test_handle_clipboard_with_markdown() {
+fn test_handle_clipboard_internal_markdown() {
     // Set up environment variables for the test
     temp_env::with_vars(
         [
@@ -31,19 +31,15 @@ fn test_handle_clipboard_with_markdown() {
             ("URL", Some("https://example.com")),
         ],
         || {
-            // We can't actually call handle_clipboard() directly because it calls std::process::exit(0)
-            // Instead, we'll verify that the environment variables are set correctly
-            assert_eq!(env::var("ALFRUSCO_COMMAND").unwrap(), "markdown");
-            assert_eq!(env::var("TITLE").unwrap(), "Test Title");
-            assert_eq!(env::var("URL").unwrap(), "https://example.com");
-            
-            // The actual clipboard operation would happen here in the real code
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, Some(0));
         },
     );
 }
 
 #[test]
-fn test_handle_clipboard_with_richtext() {
+fn test_handle_clipboard_internal_richtext() {
     // Set up environment variables for the test
     temp_env::with_vars(
         [
@@ -52,19 +48,15 @@ fn test_handle_clipboard_with_richtext() {
             ("URL", Some("https://example.com")),
         ],
         || {
-            // We can't actually call handle_clipboard() directly because it calls std::process::exit(0)
-            // Instead, we'll verify that the environment variables are set correctly
-            assert_eq!(env::var("ALFRUSCO_COMMAND").unwrap(), "richtext");
-            assert_eq!(env::var("TITLE").unwrap(), "Test Title");
-            assert_eq!(env::var("URL").unwrap(), "https://example.com");
-            
-            // The actual clipboard operation would happen here in the real code
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, Some(0));
         },
     );
 }
 
 #[test]
-fn test_handle_clipboard_no_command() {
+fn test_handle_clipboard_internal_no_command() {
     // Set up environment variables for the test with no ALFRUSCO_COMMAND
     temp_env::with_vars(
         [
@@ -73,11 +65,60 @@ fn test_handle_clipboard_no_command() {
             ("URL", Some("https://example.com")),
         ],
         || {
-            // In this case, handle_clipboard() would do nothing
-            // We're just verifying that the environment is set up correctly
-            assert!(env::var("ALFRUSCO_COMMAND").is_err());
-            assert_eq!(env::var("TITLE").unwrap(), "Test Title");
-            assert_eq!(env::var("URL").unwrap(), "https://example.com");
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, None);
+        },
+    );
+}
+
+#[test]
+fn test_handle_clipboard_internal_missing_title() {
+    // Set up environment variables for the test with missing title
+    temp_env::with_vars(
+        [
+            ("ALFRUSCO_COMMAND", Some("markdown")),
+            ("TITLE", None),
+            ("URL", Some("https://example.com")),
+        ],
+        || {
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, None);
+        },
+    );
+}
+
+#[test]
+fn test_handle_clipboard_internal_missing_url() {
+    // Set up environment variables for the test with missing URL
+    temp_env::with_vars(
+        [
+            ("ALFRUSCO_COMMAND", Some("markdown")),
+            ("TITLE", Some("Test Title")),
+            ("URL", None),
+        ],
+        || {
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, None);
+        },
+    );
+}
+
+#[test]
+fn test_handle_clipboard_internal_unknown_command() {
+    // Set up environment variables for the test with unknown command
+    temp_env::with_vars(
+        [
+            ("ALFRUSCO_COMMAND", Some("unknown")),
+            ("TITLE", Some("Test Title")),
+            ("URL", Some("https://example.com")),
+        ],
+        || {
+            // Test the internal function that doesn't call exit()
+            let result = handle_clipboard_internal();
+            assert_eq!(result, None);
         },
     );
 }

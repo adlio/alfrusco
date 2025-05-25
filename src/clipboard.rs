@@ -1,4 +1,5 @@
 use std::env::var;
+use std::io::Write;
 use std::process::Command;
 
 use clipboard::{ClipboardContext, ClipboardProvider};
@@ -7,10 +8,25 @@ use log::{debug, info};
 
 use crate::Response;
 
+/// Handle clipboard operations based on environment variables.
+/// This is the main entry point for clipboard operations.
 pub fn handle_clipboard() {
+    let result = handle_clipboard_internal();
+    
+    // If the operation was successful and requires exiting, exit the process
+    if let Some(exit_code) = result {
+        std::process::exit(exit_code);
+    }
+}
+
+/// Internal implementation of handle_clipboard that doesn't call exit().
+/// Returns Some(exit_code) if the process should exit, None otherwise.
+/// This separation makes the function testable.
+pub fn handle_clipboard_internal() -> Option<i32> {
     let cmd = var("ALFRUSCO_COMMAND").ok();
     let title = var("TITLE").ok();
     let url = var("URL").ok();
+    
     if let Some(cmd) = cmd {
         debug!("ALFRUSCO_COMMAND provided. Alfrusco will handle this request");
 
@@ -21,13 +37,23 @@ pub fn handle_clipboard() {
                 } else if cmd == "markdown" {
                     copy_markdown_link_to_clipboard(title, url);
                 }
-                Response::new().write(std::io::stdout()).unwrap();
-                std::process::exit(0);
+                
+                // Write response and indicate that the process should exit
+                if let Err(e) = Response::new().write(std::io::stdout()) {
+                    eprintln!("Error writing response: {}", e);
+                    return Some(1);
+                }
+                return Some(0);
             }
         }
     }
+    
+    // No clipboard operation was performed
+    None
 }
 
+/// Copy a markdown link to the clipboard.
+/// Format: [title](url)
 pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
     let markdown = format!("[{}]({})", title.into(), url.into());
     let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
@@ -35,6 +61,8 @@ pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<
     info!("wrote Markdown: {markdown} to the clipboard");
 }
 
+/// Copy a rich text link to the clipboard.
+/// Format: <a href="url">title</a>
 pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
     let html = format!("<a href=\"{}\">{}</a>", url.into(), title.into());
 
@@ -56,4 +84,102 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
     }
 
     info!("wrote HTML to the clipboard as rich text: {html}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+    use temp_env::with_vars;
+    
+    #[test]
+    fn test_handle_clipboard_internal_no_command() {
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", None),
+                ("TITLE", Some("Test Title")),
+                ("URL", Some("https://example.com")),
+            ],
+            || {
+                let result = handle_clipboard_internal();
+                assert_eq!(result, None);
+            },
+        );
+    }
+    
+    #[test]
+    fn test_handle_clipboard_internal_markdown() {
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", Some("markdown")),
+                ("TITLE", Some("Test Title")),
+                ("URL", Some("https://example.com")),
+            ],
+            || {
+                // We can't fully test the clipboard operation in an automated test,
+                // but we can verify that the function returns the expected exit code
+                let result = handle_clipboard_internal();
+                assert_eq!(result, Some(0));
+            },
+        );
+    }
+    
+    #[test]
+    fn test_handle_clipboard_internal_richtext() {
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", Some("richtext")),
+                ("TITLE", Some("Test Title")),
+                ("URL", Some("https://example.com")),
+            ],
+            || {
+                // We can't fully test the clipboard operation in an automated test,
+                // but we can verify that the function returns the expected exit code
+                let result = handle_clipboard_internal();
+                assert_eq!(result, Some(0));
+            },
+        );
+    }
+    
+    #[test]
+    fn test_handle_clipboard_internal_missing_params() {
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", Some("markdown")),
+                ("TITLE", None),
+                ("URL", Some("https://example.com")),
+            ],
+            || {
+                let result = handle_clipboard_internal();
+                assert_eq!(result, None);
+            },
+        );
+        
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", Some("markdown")),
+                ("TITLE", Some("Test Title")),
+                ("URL", None),
+            ],
+            || {
+                let result = handle_clipboard_internal();
+                assert_eq!(result, None);
+            },
+        );
+    }
+    
+    #[test]
+    fn test_handle_clipboard_internal_unknown_command() {
+        with_vars(
+            [
+                ("ALFRUSCO_COMMAND", Some("unknown")),
+                ("TITLE", Some("Test Title")),
+                ("URL", Some("https://example.com")),
+            ],
+            || {
+                let result = handle_clipboard_internal();
+                assert_eq!(result, None);
+            },
+        );
+    }
 }
