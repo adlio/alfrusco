@@ -19,10 +19,10 @@ clean:
 	cargo llvm-cov clean
 
 coverage: check-llvm-cov
-	cargo llvm-cov --all-features --examples
+	cargo llvm-cov --all-features --examples --tests
 
 coverage-html: check-llvm-cov
-	cargo llvm-cov --all-features --examples --html --open
+	cargo llvm-cov --all-features --examples --tests --html --open
 
 coverage-ci: check-llvm-cov
 	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info

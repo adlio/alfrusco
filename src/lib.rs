@@ -4,7 +4,7 @@ use async_trait::async_trait;
 // Internal modules
 mod background;
 mod background_job;
-mod clipboard;
+pub mod clipboard;
 mod error;
 mod item;
 mod response;
