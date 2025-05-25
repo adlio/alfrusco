@@ -32,7 +32,7 @@ mod tests {
     #[test]
     fn test_url_items_workflow() {
         let command = URLItemsWorkflow {};
-        let dir = tempfile::tempdir().unwrap().into_path();
+        let dir = tempfile::tempdir().unwrap().keep();
         let mut buffer = Vec::new();
         alfrusco::execute(&config::TestingProvider(dir), command, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();

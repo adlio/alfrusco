@@ -41,13 +41,13 @@ mod tests {
 
     #[test]
     fn test_sleep_workflow() {
-        let tempdir = tempfile::tempdir().unwrap();
+        let tempdir = tempfile::tempdir().unwrap().keep();
         let workflow = SleepCommand {
             duration_in_seconds: 5,
         };
         let mut buffer = Vec::new();
         alfrusco::execute(
-            &config::TestingProvider(tempdir.path().into()),
+            &config::TestingProvider(tempdir),
             workflow,
             &mut buffer,
         );

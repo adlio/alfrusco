@@ -19,14 +19,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            Error::Io(ref err) => write!(f, "IO Error: {}", err),
-            Error::Fmt(ref err) => write!(f, "Fmt Error: {}", err),
-            Error::FromUtf8(ref err) => write!(f, "FromUtf8 Error: {}", err),
-            Error::ParseInt(ref err) => write!(f, "ParseIntError: {}", err),
-            Error::Serde(ref err) => write!(f, "Serde Error: {}", err),
-            Error::Var(ref err) => write!(f, "Var Error: {}", err),
-            Error::MissingEnvVar(ref var) => write!(f, "Missing environment variable: {}", var),
-            Error::Workflow(ref msg) => write!(f, "Workflow Error: {}", msg),
+            Error::Io(ref err) => write!(f, "IO Error: {err}"),
+            Error::Fmt(ref err) => write!(f, "Fmt Error: {err}"),
+            Error::FromUtf8(ref err) => write!(f, "FromUtf8 Error: {err}"),
+            Error::ParseInt(ref err) => write!(f, "ParseIntError: {err}"),
+            Error::Serde(ref err) => write!(f, "Serde Error: {err}"),
+            Error::Var(ref err) => write!(f, "Var Error: {err}"),
+            Error::MissingEnvVar(ref var) => write!(f, "Missing environment variable: {var}"),
+            Error::Workflow(ref msg) => write!(f, "Workflow Error: {msg}"),
         }
     }
 }
@@ -99,9 +99,9 @@ pub trait WorkflowError: std::error::Error + std::fmt::Display {
         match self.source() {
             Some(source) => {
                 let type_name = type_name_of_val(source);
-                Item::new(format!("Error: {}", self)).subtitle(type_name.to_string())
+                Item::new(format!("Error: {self}")).subtitle(type_name.to_string())
             }
-            None => Item::new(format!("An error occurred: {}", self)),
+            None => Item::new(format!("An error occurred: {self}")),
         }
     }
 }

@@ -74,7 +74,7 @@ fn setup_workflow(provider: &dyn ConfigProvider) -> Workflow {
     match Workflow::new(config.unwrap()) {
         Ok(workflow) => workflow,
         Err(e) => {
-            eprintln!("Error creating workflow: {}", e);
+            eprintln!("Error creating workflow: {e}");
             std::process::exit(1);
         }
     }
@@ -89,7 +89,7 @@ fn finalize_workflow(mut workflow: Workflow, writer: &mut dyn std::io::Write) {
     match workflow.response.write(writer) {
         Ok(_) => {}
         Err(e) => {
-            eprintln!("Error writing response: {}", e);
+            eprintln!("Error writing response: {e}");
             std::process::exit(1);
         }
     }

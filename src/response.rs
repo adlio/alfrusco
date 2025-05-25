@@ -203,7 +203,7 @@ mod tests {
             let result = json!({ "duration": duration_as_seconds(&Some(duration), serde_json::value::Serializer).unwrap() });
             assert_eq!(
                 result.to_string(),
-                format!(r#"{{"duration":{}}}"#, expected)
+                format!(r#"{{"duration":{expected}}}"#)
             );
         }
 

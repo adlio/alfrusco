@@ -112,7 +112,7 @@ impl From<URLItem> for Item {
             item = item
                 .modifier(
                     Modifier::new_combo(&[Key::Cmd, Key::Shift])
-                        .subtitle(format!("Copy Markdown Link '{}'", short_title))
+                        .subtitle(format!("Copy Markdown Link '{short_title}'"))
                         .arg("run")
                         .var("ALFRUSCO_COMMAND", "markdown")
                         .var("TITLE", short_title)
@@ -121,7 +121,7 @@ impl From<URLItem> for Item {
                 )
                 .modifier(
                     Modifier::new_combo(&[Key::Alt, Key::Shift])
-                        .subtitle(format!("Copy Rich Text Link '{}'", short_title))
+                        .subtitle(format!("Copy Rich Text Link '{short_title}'"))
                         .arg("run")
                         .var("ALFRUSCO_COMMAND", "richtext")
                         .var("TITLE", short_title)
@@ -134,7 +134,7 @@ impl From<URLItem> for Item {
             item = item
                 .modifier(
                     Modifier::new_combo(&[Key::Cmd, Key::Ctrl])
-                        .subtitle(format!("Copy Markdown Link '{}'", long_title))
+                        .subtitle(format!("Copy Markdown Link '{long_title}'"))
                         .arg("run")
                         .var("ALFRUSCO_COMMAND", "markdown")
                         .var("TITLE", long_title)
@@ -143,7 +143,7 @@ impl From<URLItem> for Item {
                 )
                 .modifier(
                     Modifier::new_combo(&[Key::Alt, Key::Ctrl])
-                        .subtitle(format!("Copy Rich Text Link '{}'", long_title))
+                        .subtitle(format!("Copy Rich Text Link '{long_title}'"))
                         .arg("run")
                         .var("ALFRUSCO_COMMAND", "richtext")
                         .var("TITLE", long_title)

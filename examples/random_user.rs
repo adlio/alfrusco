@@ -22,7 +22,7 @@ impl AsyncRunnable for RandomUserWorkflow {
 
     async fn run_async(self, wf: &mut Workflow) -> Result<(), RandomUserError> {
         if let Some(name) = self.name {
-            wf.append_item(Item::new(format!("NAME DEFINED AS: '{}'", name)));
+            wf.append_item(Item::new(format!("NAME DEFINED AS: '{name}'")));
             return Ok(());
         }
 
@@ -93,8 +93,8 @@ impl WorkflowError for RandomUserError {}
 impl std::fmt::Display for RandomUserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RandomUserError::Reqwest(e) => write!(f, "Reqwest error: {}", e),
-            RandomUserError::Json(e) => write!(f, "JSON error: {}", e),
+            RandomUserError::Reqwest(e) => write!(f, "Reqwest error: {e}"),
+            RandomUserError::Json(e) => write!(f, "JSON error: {e}"),
         }
     }
 }
@@ -120,7 +120,7 @@ mod tests {
         };
 
         let mut buffer = Vec::new();
-        let dir = tempfile::tempdir().unwrap().into_path();
+        let dir = tempfile::tempdir().unwrap().keep();
         alfrusco::execute_async(&config::TestingProvider(dir), command, &mut buffer).await;
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"Mr Fletcher Hall\""));

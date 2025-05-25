@@ -32,7 +32,7 @@ pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<
     let markdown = format!("[{}]({})", title.into(), url.into());
     let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
     ctx.set_contents(markdown.clone()).unwrap();
-    info!("wrote Markdown: {} to the clipboard", markdown);
+    info!("wrote Markdown: {markdown} to the clipboard");
 }
 
 pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
@@ -52,8 +52,8 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        panic!("osascript command failed: {}", stderr);
+        panic!("osascript command failed: {stderr}");
     }
 
-    info!("wrote HTML to the clipboard as rich text: {}", html);
+    info!("wrote HTML to the clipboard as rich text: {html}");
 }

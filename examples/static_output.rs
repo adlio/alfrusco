@@ -31,7 +31,7 @@ mod tests {
     fn test_static_output_workflow() {
         let command = StaticOutputWorkflow {};
         let mut buffer = Vec::new();
-        let dir = tempfile::tempdir().unwrap().into_path();
+        let dir = tempfile::tempdir().unwrap().keep();
         alfrusco::execute(&config::TestingProvider(dir), command, &mut buffer);
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"First Option\""));

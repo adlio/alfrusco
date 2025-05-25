@@ -115,7 +115,7 @@ impl<'a> BackgroundJob<'a> {
             Err(e) => {
                 error!("Error starting job '{}': {}", self.id, e);
                 let error_item = Item::new(format!("Background Job '{}'", self.id))
-                    .subtitle(format!("Error starting job: {}", e));
+                    .subtitle(format!("Error starting job: {e}"));
                 Some(error_item)
             }
         }

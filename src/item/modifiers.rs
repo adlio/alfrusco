@@ -67,7 +67,7 @@ pub struct Modifier {
 impl Modifier {
     pub fn new(key: Key) -> Self {
         Self {
-            keys: format!("{}", key),
+            keys: format!("{key}"),
             ..Self::default()
         }
     }
@@ -76,7 +76,7 @@ impl Modifier {
         Self {
             keys: keys
                 .iter()
-                .map(|key| format!("{}", key))
+                .map(|key| format!("{key}"))
                 .collect::<Vec<String>>()
                 .join("+"),
             ..Self::default()
