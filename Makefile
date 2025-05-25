@@ -16,16 +16,16 @@ release:
 
 clean:
 	cargo clean
-	cargo llvm-cov clean --workspace
+	cargo llvm-cov clean
 
 coverage: check-llvm-cov
-	cargo llvm-cov --all-features --workspace
+	cargo llvm-cov --all-features --examples
 
 coverage-html: check-llvm-cov
-	cargo llvm-cov --all-features --workspace --html --open
+	cargo llvm-cov --all-features --examples --html --open
 
 coverage-ci: check-llvm-cov
-	cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info
 
 check-llvm-cov:
 	@command -v cargo-llvm-cov >/dev/null 2>&1 || { echo "cargo-llvm-cov is not installed. Install it with: cargo install cargo-llvm-cov"; exit 1; }
