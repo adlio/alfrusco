@@ -2,7 +2,7 @@ use std::sync::Once;
 use std::{env, io};
 
 use alfrusco::clipboard::{
-    copy_markdown_link_to_clipboard, copy_rich_text_link_to_clipboard, handle_clipboard_internal,
+    copy_markdown_link_to_clipboard, copy_rich_text_link_to_clipboard, handle_clipboard,
 };
 use alfrusco::Response;
 
@@ -37,7 +37,7 @@ fn test_copy_rich_text_link_to_clipboard() {
 }
 
 #[test]
-fn test_handle_clipboard_internal_markdown() {
+fn test_handle_clipboard_markdown() {
     initialize();
     // Set up environment variables for the test
     temp_env::with_vars(
@@ -48,14 +48,14 @@ fn test_handle_clipboard_internal_markdown() {
         ],
         || {
             // Test the internal function that doesn't call exit()
-            let result = handle_clipboard_internal();
-            assert_eq!(result, Some(0));
+            let result = handle_clipboard();
+            assert!(result);
         },
     );
 }
 
 #[test]
-fn test_handle_clipboard_internal_error_path() {
+fn test_handle_internal_error_path() {
     initialize();
     // Set up environment variables for the test
     temp_env::with_vars(

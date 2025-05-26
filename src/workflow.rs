@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::clipboard::handle_clipboard;
 use crate::config::{ConfigProvider, WorkflowConfig};
 use crate::error::Result;
+use crate::internal_handlers::handle;
 use crate::item::Item;
 use crate::response::Response;
 use crate::sort_and_filter::filter_and_sort_items;
@@ -79,9 +79,9 @@ impl Workflow {
 /// Sets up a workflow using the provided configuration provider.
 ///
 /// This function:
-/// 1. Handles clipboard operations
-/// 2. Loads configuration from the provider
-/// 3. Creates a new workflow instance
+/// 1. Loads configuration from the provider
+/// 2. Creates a new workflow instance
+/// 3. Handles special commands (clipboard operations, workflow directories)
 ///
 /// # Panics
 ///
@@ -89,19 +89,26 @@ impl Workflow {
 /// - The configuration cannot be loaded
 /// - The workflow cannot be created
 pub fn setup_workflow(provider: &dyn ConfigProvider) -> Workflow {
-    handle_clipboard();
     let config = provider.config();
     if config.is_err() {
         eprintln!("Error loading config: {}", config.unwrap_err());
         std::process::exit(1);
     }
-    match Workflow::new(config.unwrap()) {
+
+    let mut workflow = match Workflow::new(config.unwrap()) {
         Ok(workflow) => workflow,
         Err(e) => {
             eprintln!("Error creating workflow: {e}");
             std::process::exit(1);
         }
+    };
+
+    // Handle special commands after creating the workflow
+    if handle(&mut workflow) {
+        std::process::exit(0);
     }
+
+    workflow
 }
 
 /// Finalizes a workflow by applying filtering if needed and writing the response.

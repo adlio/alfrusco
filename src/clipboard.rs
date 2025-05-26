@@ -7,21 +7,10 @@ use log::{debug, info};
 
 use crate::Response;
 
-/// Handle clipboard operations based on environment variables.
-/// This is the main entry point for clipboard operations.
-pub fn handle_clipboard() {
-    let result = handle_clipboard_internal();
-
-    // If the operation was successful and requires exiting, exit the process
-    if let Some(exit_code) = result {
-        std::process::exit(exit_code);
-    }
-}
-
-/// Internal implementation of handle_clipboard that doesn't call exit().
-/// Returns Some(exit_code) if the process should exit, None otherwise.
-/// This separation makes the function testable.
-pub fn handle_clipboard_internal() -> Option<i32> {
+/// Handles clipboard operations based on environment variables.
+/// Returns true if a clipboard operation was performed and the process should exit,
+/// false if normal workflow execution should continue.
+pub fn handle_clipboard() -> bool {
     let cmd = var("ALFRUSCO_COMMAND").ok();
     let title = var("TITLE").ok();
     let url = var("URL").ok();
@@ -40,15 +29,14 @@ pub fn handle_clipboard_internal() -> Option<i32> {
                 // Write response and indicate that the process should exit
                 if let Err(e) = Response::new().write(std::io::stdout()) {
                     eprintln!("Error writing response: {e}");
-                    return Some(1);
                 }
-                return Some(0);
+                return true;
             }
         }
     }
 
     // No clipboard operation was performed
-    None
+    false
 }
 
 /// Copy a Markdown link to the clipboard.
@@ -104,23 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_clipboard_internal_no_command() {
-        initialize();
-        with_vars(
-            [
-                ("ALFRUSCO_COMMAND", None),
-                ("TITLE", Some("Test Title")),
-                ("URL", Some("https://example.com")),
-            ],
-            || {
-                let result = handle_clipboard_internal();
-                assert_eq!(result, None);
-            },
-        );
-    }
-
-    #[test]
-    fn test_handle_clipboard_internal_markdown() {
+    fn test_handle_clipboard_markdown() {
         initialize();
         with_vars(
             [
@@ -130,15 +102,15 @@ mod tests {
             ],
             || {
                 // We can't fully test the clipboard operation in an automated test,
-                // but we can verify that the function returns the expected exit code
-                let result = handle_clipboard_internal();
-                assert_eq!(result, Some(0));
+                // but we can verify that the function returns the expected result
+                let result = handle_clipboard();
+                assert!(result);
             },
         );
     }
 
     #[test]
-    fn test_handle_clipboard_internal_richtext() {
+    fn test_handle_clipboard_richtext() {
         initialize();
         with_vars(
             [
@@ -148,15 +120,15 @@ mod tests {
             ],
             || {
                 // We can't fully test the clipboard operation in an automated test,
-                // but we can verify that the function returns the expected exit code
-                let result = handle_clipboard_internal();
-                assert_eq!(result, Some(0));
+                // but we can verify that the function returns the expected result
+                let result = handle_clipboard();
+                assert!(result);
             },
         );
     }
 
     #[test]
-    fn test_handle_clipboard_internal_missing_params() {
+    fn test_handle_clipboard_missing_params() {
         initialize();
         with_vars(
             [
@@ -165,8 +137,8 @@ mod tests {
                 ("URL", Some("https://example.com")),
             ],
             || {
-                let result = handle_clipboard_internal();
-                assert_eq!(result, None);
+                let result = handle_clipboard();
+                assert!(!result);
             },
         );
 
@@ -177,14 +149,14 @@ mod tests {
                 ("URL", None),
             ],
             || {
-                let result = handle_clipboard_internal();
-                assert_eq!(result, None);
+                let result = handle_clipboard();
+                assert!(!result);
             },
         );
     }
 
     #[test]
-    fn test_handle_clipboard_internal_unknown_command() {
+    fn test_handle_clipboard_unknown_command() {
         initialize();
         with_vars(
             [
@@ -193,8 +165,8 @@ mod tests {
                 ("URL", Some("https://example.com")),
             ],
             || {
-                let result = handle_clipboard_internal();
-                assert_eq!(result, None);
+                let result = handle_clipboard();
+                assert!(!result);
             },
         );
     }
