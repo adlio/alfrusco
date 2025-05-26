@@ -33,10 +33,17 @@ fn test_background_job_lifecycle() {
     // Sleep briefly to allow the process to complete
     std::thread::sleep(Duration::from_millis(100));
 
+    // Create a status file with "success" to simulate a successful job
+    let status_file = job_dir.join("job.status");
+    std::fs::write(&status_file, "success").unwrap();
+
     // Run the job again - this should now create a last_run file
     let mut cmd2 = Command::new("echo");
     cmd2.arg("test2");
     workflow.run_in_background("test_job", Duration::from_secs(0), cmd2);
+
+    // Sleep to allow the cleanup to happen
+    std::thread::sleep(Duration::from_millis(500));
 
     // Verify that the last_run file exists
     let last_run_file = job_dir.join("job.last_run");
