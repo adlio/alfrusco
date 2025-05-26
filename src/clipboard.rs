@@ -87,10 +87,10 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
 
 #[cfg(test)]
 mod tests {
-    use temp_env::with_vars;
-    use std::io;
     use std::sync::Once;
-    use std::env;
+    use std::{env, io};
+
+    use temp_env::with_vars;
 
     use super::*;
 

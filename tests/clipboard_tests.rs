@@ -1,6 +1,5 @@
-use std::env;
-use std::io;
 use std::sync::Once;
+use std::{env, io};
 
 use alfrusco::clipboard::{
     copy_markdown_link_to_clipboard, copy_rich_text_link_to_clipboard, handle_clipboard_internal,
@@ -70,7 +69,10 @@ fn test_handle_clipboard_internal_error_path() {
             struct FailingWriter;
             impl io::Write for FailingWriter {
                 fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-                    Err(io::Error::new(io::ErrorKind::Other, "Simulated write error"))
+                    Err(io::Error::new(
+                        io::ErrorKind::Other,
+                        "Simulated write error",
+                    ))
                 }
                 fn flush(&mut self) -> io::Result<()> {
                     Ok(())

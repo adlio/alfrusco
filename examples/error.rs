@@ -1,7 +1,8 @@
-use alfrusco::{config, Item, Workflow, WorkflowError};
-use clap::Parser;
 use std::fs::File;
 use std::io::Read;
+
+use alfrusco::{config, Item, Workflow, WorkflowError};
+use clap::Parser;
 
 #[derive(Parser, Debug)]
 struct ErrorWorkflow {
@@ -17,21 +18,24 @@ pub fn main() {
 
 impl alfrusco::Runnable for ErrorWorkflow {
     type Error = ErrorWorkflowError;
-    
+
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         // This will deliberately cause an error if file_path is provided
         if let Some(file_path) = self.file_path {
             // Try to open a file that likely doesn't exist
             let mut file = File::open(&file_path).map_err(|e| ErrorWorkflowError::Io(e))?;
-            
+
             let mut content = String::new();
-            file.read_to_string(&mut content).map_err(|e| ErrorWorkflowError::Io(e))?;
-            
+            file.read_to_string(&mut content)
+                .map_err(|e| ErrorWorkflowError::Io(e))?;
+
             wf.append_item(Item::new(format!("File content: {}", content)));
             Ok(())
         } else {
             // Demonstrate a custom error
-            Err(ErrorWorkflowError::Custom("No file path provided".to_string()))
+            Err(ErrorWorkflowError::Custom(
+                "No file path provided".to_string(),
+            ))
         }
     }
 }
@@ -84,8 +88,8 @@ mod tests {
 
     #[test]
     fn test_error_workflow_nonexistent_file() {
-        let command = ErrorWorkflow { 
-            file_path: Some("nonexistent_file.txt".to_string()) 
+        let command = ErrorWorkflow {
+            file_path: Some("nonexistent_file.txt".to_string()),
         };
         let mut buffer = Vec::new();
         let dir = tempfile::tempdir().unwrap().keep();

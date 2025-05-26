@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::{Workflow, WorkflowError};
 use crate::config::ConfigProvider;
-use crate::workflow::{setup_workflow, finalize_workflow};
+use crate::workflow::{finalize_workflow, setup_workflow};
+use crate::{Workflow, WorkflowError};
 
 pub trait Runnable {
     type Error: WorkflowError;

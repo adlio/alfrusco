@@ -1,12 +1,13 @@
+use std::time::Duration;
+
 use alfrusco::{config, AsyncRunnable, Item, Workflow, WorkflowError};
 use clap::Parser;
-use std::time::Duration;
 
 #[derive(Parser, Debug)]
 struct AsyncErrorWorkflow {
     #[arg(short, long)]
     pub url: Option<String>,
-    
+
     #[arg(short, long)]
     pub timeout: Option<u64>,
 }
@@ -26,9 +27,12 @@ impl AsyncRunnable for AsyncErrorWorkflow {
         // If timeout is provided, simulate a timeout error
         if let Some(timeout) = self.timeout {
             tokio::time::sleep(Duration::from_secs(timeout)).await;
-            return Err(AsyncErrorWorkflowError::Timeout(format!("Operation timed out after {} seconds", timeout)));
+            return Err(AsyncErrorWorkflowError::Timeout(format!(
+                "Operation timed out after {} seconds",
+                timeout
+            )));
         }
-        
+
         // If URL is provided, try to fetch it (likely to cause errors with invalid URLs)
         if let Some(url) = self.url {
             let client = reqwest::Client::new();
@@ -38,17 +42,24 @@ impl AsyncRunnable for AsyncErrorWorkflow {
                 .send()
                 .await
                 .map_err(|e| AsyncErrorWorkflowError::Request(e))?;
-                
+
             if !response.status().is_success() {
-                return Err(AsyncErrorWorkflowError::StatusCode(response.status().as_u16()));
+                return Err(AsyncErrorWorkflowError::StatusCode(
+                    response.status().as_u16(),
+                ));
             }
-            
-            let body = response.text().await.map_err(|e| AsyncErrorWorkflowError::Request(e))?;
+
+            let body = response
+                .text()
+                .await
+                .map_err(|e| AsyncErrorWorkflowError::Request(e))?;
             wf.append_item(Item::new(format!("Response: {} bytes", body.len())));
             Ok(())
         } else {
             // Demonstrate a custom error
-            Err(AsyncErrorWorkflowError::Custom("No URL provided".to_string()))
+            Err(AsyncErrorWorkflowError::Custom(
+                "No URL provided".to_string(),
+            ))
         }
     }
 }
@@ -73,7 +84,9 @@ impl std::fmt::Display for AsyncErrorWorkflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AsyncErrorWorkflowError::Request(e) => write!(f, "Request error: {}", e),
-            AsyncErrorWorkflowError::StatusCode(code) => write!(f, "HTTP error: status code {}", code),
+            AsyncErrorWorkflowError::StatusCode(code) => {
+                write!(f, "HTTP error: status code {}", code)
+            }
             AsyncErrorWorkflowError::Timeout(msg) => write!(f, "Timeout error: {}", msg),
             AsyncErrorWorkflowError::Custom(msg) => write!(f, "Error: {}", msg),
         }
@@ -97,7 +110,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_error_workflow_no_url() {
-        let command = AsyncErrorWorkflow { 
+        let command = AsyncErrorWorkflow {
             url: None,
             timeout: None,
         };
@@ -110,7 +123,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_error_workflow_invalid_url() {
-        let command = AsyncErrorWorkflow { 
+        let command = AsyncErrorWorkflow {
             url: Some("invalid://url".to_string()),
             timeout: None,
         };

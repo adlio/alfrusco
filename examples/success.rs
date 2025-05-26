@@ -15,7 +15,7 @@ pub fn main() {
 
 impl alfrusco::Runnable for SuccessWorkflow {
     type Error = alfrusco::Error;
-    
+
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         let message = self.message.unwrap_or_else(|| "Hello, World!".to_string());
         wf.append_item(Item::new(message).subtitle("Success workflow example"));
@@ -29,8 +29,8 @@ mod tests {
 
     #[test]
     fn test_success_workflow() {
-        let command = SuccessWorkflow { 
-            message: Some("Test message".to_string()) 
+        let command = SuccessWorkflow {
+            message: Some("Test message".to_string()),
         };
         let mut buffer = Vec::new();
         let dir = tempfile::tempdir().unwrap().keep();

@@ -59,9 +59,9 @@ fn test_execute_success() {
     let runnable = TestRunnable { should_fail: false };
     let mut buffer = Vec::new();
     let dir = tempfile::tempdir().unwrap().keep();
-    
+
     alfrusco::execute(&config::TestingProvider(dir), runnable, &mut buffer);
-    
+
     let output = String::from_utf8(buffer).unwrap();
     assert!(output.contains("Success"));
     assert!(!output.contains("Test error"));
@@ -72,9 +72,9 @@ fn test_execute_failure() {
     let runnable = TestRunnable { should_fail: true };
     let mut buffer = Vec::new();
     let dir = tempfile::tempdir().unwrap().keep();
-    
+
     alfrusco::execute(&config::TestingProvider(dir), runnable, &mut buffer);
-    
+
     let output = String::from_utf8(buffer).unwrap();
     assert!(output.contains("Test error: Intentional failure"));
 }
@@ -84,9 +84,9 @@ async fn test_execute_async_success() {
     let runnable = TestAsyncRunnable { should_fail: false };
     let mut buffer = Vec::new();
     let dir = tempfile::tempdir().unwrap().keep();
-    
+
     alfrusco::execute_async(&config::TestingProvider(dir), runnable, &mut buffer).await;
-    
+
     let output = String::from_utf8(buffer).unwrap();
     assert!(output.contains("Async Success"));
     assert!(!output.contains("Test error"));
@@ -97,9 +97,9 @@ async fn test_execute_async_failure() {
     let runnable = TestAsyncRunnable { should_fail: true };
     let mut buffer = Vec::new();
     let dir = tempfile::tempdir().unwrap().keep();
-    
+
     alfrusco::execute_async(&config::TestingProvider(dir), runnable, &mut buffer).await;
-    
+
     let output = String::from_utf8(buffer).unwrap();
     assert!(output.contains("Test error: Intentional async failure"));
 }

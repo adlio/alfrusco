@@ -212,26 +212,26 @@ mod tests {
     #[test]
     fn test_write_error() -> Result<()> {
         use std::io::{Error, ErrorKind};
-        
+
         struct FailingWriter;
-        
+
         impl io::Write for FailingWriter {
             fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
                 Err(Error::new(ErrorKind::Other, "Simulated write error"))
             }
-            
+
             fn flush(&mut self) -> io::Result<()> {
                 // This line is executed when the write method fails
                 // and the error is propagated up
                 Ok(())
             }
         }
-        
+
         let response = Response::default();
         let result = response.write(FailingWriter);
-        
+
         assert!(result.is_err());
-        
+
         // Test that the error is properly propagated
         match result {
             Err(e) => {
@@ -247,23 +247,26 @@ mod tests {
         // Create a response with a different structure than expected
         let mut response = Response::default();
         response.items(vec![Item::new("Actual Item")]);
-        
+
         // Create an expected string that won't match
         let expected = r#"{"items":[{"title":"Expected Item"}]}"#;
-        
+
         // Create a buffer to serialize the response
         let mut buffer = Vec::new();
         response.write(&mut buffer).unwrap();
         let actual = String::from_utf8(buffer).unwrap();
-        
+
         // Verify they don't match and the error message is used
         if actual == expected {
             panic!("Test setup error: expected and actual should differ");
         } else {
             // Force the test to actually execute this branch
             let err_msg = "Serialization of alfrusco::Response didn't match expected JSON";
-            assert_eq!(err_msg, "Serialization of alfrusco::Response didn't match expected JSON");
-            
+            assert_eq!(
+                err_msg,
+                "Serialization of alfrusco::Response didn't match expected JSON"
+            );
+
             // Simulate what would happen if assert_matches was called directly
             let result = std::panic::catch_unwind(|| {
                 assert_eq!(actual, expected, "{}", err_msg);
@@ -277,15 +280,15 @@ mod tests {
         // Create a buffer with invalid UTF-8
         let mut buffer = Vec::new();
         buffer.push(0xFF); // Invalid UTF-8 byte
-        
+
         // This should fail with a UTF-8 error
         let result = String::from_utf8(buffer);
         assert!(result.is_err());
-        
+
         // Test that the error path in assert_matches would be triggered
         let err = result.unwrap_err();
         assert!(err.to_string().contains("invalid utf-8"));
-        
+
         Ok(())
     }
 
@@ -293,15 +296,15 @@ mod tests {
     fn test_assertion_error_message() {
         // This test directly tests the error message used in assert_matches
         let error_message = "Serialization of alfrusco::Response didn't match expected JSON";
-        
+
         // Create a situation where assert_eq would fail
         let result = std::panic::catch_unwind(|| {
             assert_eq!("expected", "actual", "{}", error_message);
         });
-        
+
         // Verify that the panic occurred (assertion failed)
         assert!(result.is_err());
-        
+
         // Extract the panic message to verify it contains our error message
         if let Err(panic_payload) = result {
             if let Some(message) = panic_payload.downcast_ref::<String>() {
@@ -323,29 +326,29 @@ mod tests {
         );
         Ok(())
     }
-    
+
     #[test]
     fn test_assert_matches_utf8_error() {
         // Create an invalid UTF-8 sequence
         let mut buffer = Vec::new();
         buffer.push(0xFF); // Invalid UTF-8 byte
-        
+
         // Attempt to convert to a string, which should fail
         let result = String::from_utf8(buffer);
         assert!(result.is_err());
-        
+
         // Verify the error message
         let err = result.unwrap_err();
         assert!(err.to_string().contains("invalid utf-8"));
-        
+
         // Now test how assert_matches would handle this error
         let response = Response::default();
         let mut buffer = Vec::new();
         response.write(&mut buffer).unwrap();
-        
+
         // Corrupt the buffer with invalid UTF-8
         buffer[0] = 0xFF;
-        
+
         // Create a function that mimics assert_matches but returns a Result
         let result = (|| -> Result<()> {
             let _actual = String::from_utf8(buffer)?;
@@ -355,7 +358,7 @@ mod tests {
             assert!(expected.len() > 0);
             Ok(())
         })();
-        
+
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("invalid utf-8"));
     }
@@ -364,10 +367,10 @@ mod tests {
     fn test_append_items() -> Result<()> {
         let mut response = Response::new_with_items(vec![Item::new("First Item")]);
         response.append_items(vec![Item::new("Second Item"), Item::new("Third Item")]);
-        
+
         assert_matches(
             r#"{"items":[{"title":"First Item"},{"title":"Second Item"},{"title":"Third Item"}]}"#,
-            response
+            response,
         )
     }
 
@@ -375,10 +378,10 @@ mod tests {
     fn test_prepend_items() -> Result<()> {
         let mut response = Response::new_with_items(vec![Item::new("Last Item")]);
         response.prepend_items(vec![Item::new("First Item"), Item::new("Second Item")]);
-        
+
         assert_matches(
             r#"{"items":[{"title":"First Item"},{"title":"Second Item"},{"title":"Last Item"}]}"#,
-            response
+            response,
         )
     }
 
@@ -388,31 +391,32 @@ mod tests {
             seconds: Some(Duration::from_secs(60)),
             loose_reload: Some(true),
         };
-        
+
         let json = serde_json::to_string(&cache_settings)?;
         assert_eq!(json, r#"{"seconds":60,"loosereload":true}"#);
-        
+
         let cache_settings_partial = CacheSettings {
             seconds: Some(Duration::from_secs(30)),
             loose_reload: None,
         };
-        
+
         let json = serde_json::to_string(&cache_settings_partial)?;
         assert_eq!(json, r#"{"seconds":30}"#);
-        
+
         Ok(())
     }
 
     #[test]
     fn test_response_with_multiple_settings() -> Result<()> {
         let mut response = Response::new_with_items(vec![Item::new("Test Item")]);
-        response.rerun(Duration::from_secs(5))
-               .skip_knowledge(true)
-               .cache(Duration::from_secs(60), false);
-        
+        response
+            .rerun(Duration::from_secs(5))
+            .skip_knowledge(true)
+            .cache(Duration::from_secs(60), false);
+
         assert_matches(
             r#"{"rerun":5,"cache":{"seconds":60,"loosereload":false},"skipknowledge":true,"items":[{"title":"Test Item"}]}"#,
-            response
+            response,
         )
     }
 
@@ -422,17 +426,20 @@ mod tests {
         let zero_duration = Duration::from_secs(0);
         let result = json!({ "duration": duration_as_seconds(&Some(zero_duration), serde_json::value::Serializer).unwrap() });
         assert_eq!(result.to_string(), r#"{"duration":0}"#);
-        
+
         // Test with very small duration - this will be rounded in serialization
         let tiny_duration = Duration::from_nanos(1);
         let result = json!({ "duration": duration_as_seconds(&Some(tiny_duration), serde_json::value::Serializer).unwrap() });
         // For extremely small durations, it will be effectively 0 due to how the function works
         assert_eq!(result.to_string(), r#"{"duration":0}"#);
-        
+
         // Test with very large duration
         let large_duration = Duration::from_secs(u64::MAX);
         let result = json!({ "duration": duration_as_seconds(&Some(large_duration), serde_json::value::Serializer).unwrap() });
-        assert_eq!(result.to_string(), format!(r#"{{"duration":{}}}"#, u64::MAX));
+        assert_eq!(
+            result.to_string(),
+            format!(r#"{{"duration":{}}}"#, u64::MAX)
+        );
     }
 
     #[test]
@@ -455,10 +462,10 @@ mod tests {
             seconds: None,
             loose_reload: None,
         };
-        
+
         let json = serde_json::to_string(&cache_settings)?;
         assert_eq!(json, r#"{}"#);
-        
+
         Ok(())
     }
 }

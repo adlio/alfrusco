@@ -21,8 +21,10 @@ impl AsyncRunnable for AsyncSuccessWorkflow {
     async fn run_async(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         // Small delay to simulate async work
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        
-        let message = self.message.unwrap_or_else(|| "Hello from async!".to_string());
+
+        let message = self
+            .message
+            .unwrap_or_else(|| "Hello from async!".to_string());
         wf.append_item(Item::new(message).subtitle("Async success workflow example"));
         Ok(())
     }
@@ -34,8 +36,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_async_success_workflow() {
-        let command = AsyncSuccessWorkflow { 
-            message: Some("Async test message".to_string()) 
+        let command = AsyncSuccessWorkflow {
+            message: Some("Async test message".to_string()),
         };
         let mut buffer = Vec::new();
         let dir = tempfile::tempdir().unwrap().keep();
