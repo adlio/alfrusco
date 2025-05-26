@@ -1,12 +1,30 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use log::debug;
 
 use crate::Item;
 
 pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
+    debug!(
+        "Filtering and sorting {} items with query: '{}'",
+        items.len(),
+        query
+    );
+
+    // First, separate sticky items from regular items
+    let (sticky_items, regular_items): (Vec<Item>, Vec<Item>) =
+        items.into_iter().partition(|item| item.sticky);
+
+    debug!(
+        "Found {} sticky items and {} regular items",
+        sticky_items.len(),
+        regular_items.len()
+    );
+
     let matcher = SkimMatcherV2::default();
 
-    let mut filtered_items: Vec<(Item, i64)> = items
+    // Filter and score regular items
+    let mut filtered_items: Vec<(Item, i64)> = regular_items
         .into_iter()
         .filter_map(|item| {
             let subtitle = item.subtitle.as_deref().unwrap_or_default();
@@ -17,10 +35,34 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
         })
         .collect();
 
+    debug!(
+        "After filtering, {} regular items match the query",
+        filtered_items.len()
+    );
+
     // Sort by score in descending order
     filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
 
-    filtered_items.into_iter().map(|(item, _)| item).collect()
+    // Extract the items from the tuples
+    let mut result: Vec<Item> = filtered_items.into_iter().map(|(item, _)| item).collect();
+
+    // Add sticky items at the beginning, regardless of query
+    if !sticky_items.is_empty() {
+        debug!(
+            "Adding {} sticky items to the beginning of results",
+            sticky_items.len()
+        );
+        let mut final_result = sticky_items;
+        final_result.append(&mut result);
+        debug!("Final result has {} items", final_result.len());
+        final_result
+    } else {
+        debug!(
+            "No sticky items to add, returning {} filtered items",
+            result.len()
+        );
+        result
+    }
 }
 
 #[cfg(test)]
