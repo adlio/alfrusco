@@ -11,8 +11,6 @@ use sysinfo::System;
 use crate::workflow::Workflow;
 use crate::{Item, Result, ICON_CLOCK};
 
-
-
 pub type RunDuration = Duration;
 pub type Staleness = Duration;
 
@@ -137,10 +135,10 @@ impl<'a> BackgroundJob<'a> {
         // Ensure this job's operating directory exists
         create_dir_all(self.job_dir())?;
         let staleness = self.get_staleness();
-        
+
         // Check if there's a process running for this job
         let run_duration = self.get_running_duration();
-        
+
         // If there's no process running but we have a PID file, it means the process
         // has terminated. We need to check if it was successful or not.
         if run_duration.is_none() && self.pid_file().exists() {
@@ -174,7 +172,7 @@ impl<'a> BackgroundJob<'a> {
                 self.save_pid(pid)?;
                 // Mark as running initially
                 self.save_job_status(JobExecutionStatus::Running)?;
-                
+
                 Ok(BackgroundJobStatus::Stale(
                     staleness,
                     RunDuration::from_secs(0),
@@ -187,7 +185,7 @@ impl<'a> BackgroundJob<'a> {
             }
         }
     }
-    
+
     /// Creates and runs a monitor script that will execute the command and update the status file
     /// based on the exit code. This script continues running even after the main process exits.
     fn create_and_run_monitor_script(&self) -> Result<u32> {
@@ -197,25 +195,25 @@ impl<'a> BackgroundJob<'a> {
                 return Err("Command does not exist".into());
             }
         }
-        
+
         // Create a temporary script file
         let script_path = self.job_dir().join("monitor.sh");
         let cmd_str = format!("{:?}", self.command);
-        
+
         // Extract the command and arguments
         let cmd_parts: Vec<&str> = cmd_str
             .trim_start_matches('"')
             .trim_end_matches('"')
             .split(' ')
             .collect();
-            
+
         if cmd_parts.is_empty() {
             return Err("Empty command".into());
         }
-        
+
         // Build the command string with proper escaping
         let cmd_exec = cmd_parts.join(" ");
-        
+
         // Create the monitor script content - using macOS-specific approach
         let script_content = format!(
             r#"#!/bin/bash
@@ -248,10 +246,10 @@ exit 0
             self.job_dir().display(),
             self.job_dir().display()
         );
-        
+
         // Write the script to a file
         fs::write(&script_path, script_content)?;
-        
+
         // Make the script executable
         #[cfg(unix)]
         {
@@ -260,16 +258,16 @@ exit 0
             perms.set_mode(0o755);
             fs::set_permissions(&script_path, perms)?;
         }
-        
+
         // Execute the script
         let mut monitor_cmd = Command::new("/bin/bash");
         monitor_cmd.arg(&script_path);
         monitor_cmd.stdout(std::process::Stdio::null());
         monitor_cmd.stderr(std::process::Stdio::null());
-        
+
         let child = monitor_cmd.spawn()?;
         let pid = child.id();
-        
+
         Ok(pid)
     }
 
@@ -284,7 +282,7 @@ exit 0
     fn last_run_file(&self) -> PathBuf {
         self.job_dir().join("job.last_run")
     }
-    
+
     fn status_file(&self) -> PathBuf {
         self.job_dir().join("job.status")
     }
@@ -307,7 +305,7 @@ exit 0
         fs::remove_file(self.pid_file())?;
         Ok(())
     }
-    
+
     fn save_job_status(&self, status: JobExecutionStatus) -> Result<()> {
         let status_str = match status {
             JobExecutionStatus::Success => "success",
@@ -318,7 +316,7 @@ exit 0
         write(self.status_file(), status_str)?;
         Ok(())
     }
-    
+
     fn get_job_status(&self) -> JobExecutionStatus {
         match fs::read_to_string(self.status_file()) {
             Ok(status) => match status.trim() {
@@ -340,11 +338,14 @@ exit 0
         match fs::metadata(self.pid_file()) {
             Ok(metadata) => {
                 let last_run_systime = metadata.modified().unwrap();
-                
+
                 // Check if the job was successful before updating last_run_file
                 let job_status = self.get_job_status();
                 if job_status == JobExecutionStatus::Success {
-                    info!("Job '{}' completed successfully, updating last_run_file", self.id);
+                    info!(
+                        "Job '{}' completed successfully, updating last_run_file",
+                        self.id
+                    );
                     let last_run_date = DateTime::<Utc>::from(last_run_systime);
                     write(self.last_run_file(), last_run_date.to_rfc3339())?;
                     let dest = File::options().write(true).open(self.last_run_file())?;
@@ -353,7 +354,10 @@ exit 0
                         .set_modified(last_run_systime);
                     dest.set_times(times)?;
                 } else if job_status == JobExecutionStatus::Failed {
-                    info!("Job '{}' failed, not updating last_run_file to allow retry", self.id);
+                    info!(
+                        "Job '{}' failed, not updating last_run_file to allow retry",
+                        self.id
+                    );
                     // Delete the last_run_file if it exists to ensure the job is considered stale
                     if self.last_run_file().exists() {
                         let _ = fs::remove_file(self.last_run_file());
@@ -366,7 +370,7 @@ exit 0
                         let _ = fs::remove_file(self.last_run_file());
                     }
                 }
-                
+
                 self.delete_pid_file()?;
                 Ok(())
             }

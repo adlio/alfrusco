@@ -23,13 +23,13 @@ impl alfrusco::Runnable for ErrorWorkflow {
         // This will deliberately cause an error if file_path is provided
         if let Some(file_path) = self.file_path {
             // Try to open a file that likely doesn't exist
-            let mut file = File::open(&file_path).map_err(|e| ErrorWorkflowError::Io(e))?;
+            let mut file = File::open(&file_path).map_err(ErrorWorkflowError::Io)?;
 
             let mut content = String::new();
             file.read_to_string(&mut content)
-                .map_err(|e| ErrorWorkflowError::Io(e))?;
+                .map_err(ErrorWorkflowError::Io)?;
 
-            wf.append_item(Item::new(format!("File content: {}", content)));
+            wf.append_item(Item::new(format!("File content: {content}")));
             Ok(())
         } else {
             // Demonstrate a custom error
@@ -57,8 +57,8 @@ impl WorkflowError for ErrorWorkflowError {}
 impl std::fmt::Display for ErrorWorkflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorWorkflowError::Io(e) => write!(f, "IO error: {}", e),
-            ErrorWorkflowError::Custom(msg) => write!(f, "Error: {}", msg),
+            ErrorWorkflowError::Io(e) => write!(f, "IO error: {e}"),
+            ErrorWorkflowError::Custom(msg) => write!(f, "Error: {msg}"),
         }
     }
 }

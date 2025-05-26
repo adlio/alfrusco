@@ -28,8 +28,7 @@ impl AsyncRunnable for AsyncErrorWorkflow {
         if let Some(timeout) = self.timeout {
             tokio::time::sleep(Duration::from_secs(timeout)).await;
             return Err(AsyncErrorWorkflowError::Timeout(format!(
-                "Operation timed out after {} seconds",
-                timeout
+                "Operation timed out after {timeout} seconds"
             )));
         }
 
@@ -41,7 +40,7 @@ impl AsyncRunnable for AsyncErrorWorkflow {
                 .timeout(Duration::from_secs(5))
                 .send()
                 .await
-                .map_err(|e| AsyncErrorWorkflowError::Request(e))?;
+                .map_err(AsyncErrorWorkflowError::Request)?;
 
             if !response.status().is_success() {
                 return Err(AsyncErrorWorkflowError::StatusCode(
@@ -52,7 +51,7 @@ impl AsyncRunnable for AsyncErrorWorkflow {
             let body = response
                 .text()
                 .await
-                .map_err(|e| AsyncErrorWorkflowError::Request(e))?;
+                .map_err(AsyncErrorWorkflowError::Request)?;
             wf.append_item(Item::new(format!("Response: {} bytes", body.len())));
             Ok(())
         } else {
@@ -83,12 +82,12 @@ impl WorkflowError for AsyncErrorWorkflowError {}
 impl std::fmt::Display for AsyncErrorWorkflowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AsyncErrorWorkflowError::Request(e) => write!(f, "Request error: {}", e),
+            AsyncErrorWorkflowError::Request(e) => write!(f, "Request error: {e}"),
             AsyncErrorWorkflowError::StatusCode(code) => {
-                write!(f, "HTTP error: status code {}", code)
+                write!(f, "HTTP error: status code {code}")
             }
-            AsyncErrorWorkflowError::Timeout(msg) => write!(f, "Timeout error: {}", msg),
-            AsyncErrorWorkflowError::Custom(msg) => write!(f, "Error: {}", msg),
+            AsyncErrorWorkflowError::Timeout(msg) => write!(f, "Timeout error: {msg}"),
+            AsyncErrorWorkflowError::Custom(msg) => write!(f, "Error: {msg}"),
         }
     }
 }

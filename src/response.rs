@@ -211,13 +211,13 @@ mod tests {
 
     #[test]
     fn test_write_error() -> Result<()> {
-        use std::io::{Error, ErrorKind};
+        use std::io::Error;
 
         struct FailingWriter;
 
         impl io::Write for FailingWriter {
             fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-                Err(Error::new(ErrorKind::Other, "Simulated write error"))
+                Err(Error::other("Simulated write error"))
             }
 
             fn flush(&mut self) -> io::Result<()> {
@@ -269,7 +269,7 @@ mod tests {
 
             // Simulate what would happen if assert_matches was called directly
             let result = std::panic::catch_unwind(|| {
-                assert_eq!(actual, expected, "{}", err_msg);
+                assert_eq!(actual, expected, "{err_msg}");
             });
             assert!(result.is_err());
         }
@@ -278,8 +278,7 @@ mod tests {
     #[test]
     fn test_utf8_conversion_error() -> std::result::Result<(), Box<dyn std::error::Error>> {
         // Create a buffer with invalid UTF-8
-        let mut buffer = Vec::new();
-        buffer.push(0xFF); // Invalid UTF-8 byte
+        let buffer = vec![0xFF]; // Invalid UTF-8 byte
 
         // This should fail with a UTF-8 error
         let result = String::from_utf8(buffer);
@@ -299,7 +298,7 @@ mod tests {
 
         // Create a situation where assert_eq would fail
         let result = std::panic::catch_unwind(|| {
-            assert_eq!("expected", "actual", "{}", error_message);
+            assert_eq!("expected", "actual", "{error_message}");
         });
 
         // Verify that the panic occurred (assertion failed)
@@ -330,8 +329,7 @@ mod tests {
     #[test]
     fn test_assert_matches_utf8_error() {
         // Create an invalid UTF-8 sequence
-        let mut buffer = Vec::new();
-        buffer.push(0xFF); // Invalid UTF-8 byte
+        let buffer = vec![0xFF]; // Invalid UTF-8 byte
 
         // Attempt to convert to a string, which should fail
         let result = String::from_utf8(buffer);
@@ -355,7 +353,7 @@ mod tests {
             // This line would normally be executed if UTF-8 conversion succeeds
             let expected = r#"{"items":[]}"#;
             // Force execution of this line for coverage
-            assert!(expected.len() > 0);
+            assert!(!expected.is_empty());
             Ok(())
         })();
 

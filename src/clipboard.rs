@@ -39,7 +39,7 @@ pub fn handle_clipboard_internal() -> Option<i32> {
 
                 // Write response and indicate that the process should exit
                 if let Err(e) = Response::new().write(std::io::stdout()) {
-                    eprintln!("Error writing response: {}", e);
+                    eprintln!("Error writing response: {e}");
                     return Some(1);
                 }
                 return Some(0);
@@ -87,8 +87,8 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::sync::Once;
-    use std::{env, io};
 
     use temp_env::with_vars;
 

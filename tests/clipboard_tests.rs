@@ -69,10 +69,7 @@ fn test_handle_clipboard_internal_error_path() {
             struct FailingWriter;
             impl io::Write for FailingWriter {
                 fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Simulated write error",
-                    ))
+                    Err(io::Error::other("Simulated write error"))
                 }
                 fn flush(&mut self) -> io::Result<()> {
                     Ok(())

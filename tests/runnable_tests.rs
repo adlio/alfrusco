@@ -9,7 +9,7 @@ enum TestError {
 impl std::fmt::Display for TestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TestError::Simple(msg) => write!(f, "Test error: {}", msg),
+            TestError::Simple(msg) => write!(f, "Test error: {msg}"),
         }
     }
 }
