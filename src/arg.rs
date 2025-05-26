@@ -9,7 +9,6 @@ pub enum Arg {
 
 #[cfg(test)]
 mod tests {
-
     use serde_json::json;
 
     use crate::Item;

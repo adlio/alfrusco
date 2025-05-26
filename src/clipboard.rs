@@ -11,7 +11,7 @@ use crate::Response;
 /// This is the main entry point for clipboard operations.
 pub fn handle_clipboard() {
     let result = handle_clipboard_internal();
-    
+
     // If the operation was successful and requires exiting, exit the process
     if let Some(exit_code) = result {
         std::process::exit(exit_code);
@@ -25,7 +25,7 @@ pub fn handle_clipboard_internal() -> Option<i32> {
     let cmd = var("ALFRUSCO_COMMAND").ok();
     let title = var("TITLE").ok();
     let url = var("URL").ok();
-    
+
     if let Some(cmd) = cmd {
         debug!("ALFRUSCO_COMMAND provided. Alfrusco will handle this request");
 
@@ -36,7 +36,7 @@ pub fn handle_clipboard_internal() -> Option<i32> {
                 } else if cmd == "markdown" {
                     copy_markdown_link_to_clipboard(title, url);
                 }
-                
+
                 // Write response and indicate that the process should exit
                 if let Err(e) = Response::new().write(std::io::stdout()) {
                     eprintln!("Error writing response: {}", e);
@@ -46,12 +46,12 @@ pub fn handle_clipboard_internal() -> Option<i32> {
             }
         }
     }
-    
+
     // No clipboard operation was performed
     None
 }
 
-/// Copy a markdown link to the clipboard.
+/// Copy a Markdown link to the clipboard.
 /// Format: [title](url)
 pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
     let markdown = format!("[{}]({})", title.into(), url.into());
@@ -87,11 +87,25 @@ pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use temp_env::with_vars;
-    
+    use std::io;
+    use std::sync::Once;
+    use std::env;
+
+    use super::*;
+
+    // Initialize test environment
+    static INIT: Once = Once::new();
+    fn initialize() {
+        INIT.call_once(|| {
+            env::set_var("RUST_LOG", "debug");
+            let _ = env_logger::builder().is_test(true).try_init();
+        });
+    }
+
     #[test]
     fn test_handle_clipboard_internal_no_command() {
+        initialize();
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", None),
@@ -104,9 +118,10 @@ mod tests {
             },
         );
     }
-    
+
     #[test]
     fn test_handle_clipboard_internal_markdown() {
+        initialize();
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", Some("markdown")),
@@ -121,9 +136,10 @@ mod tests {
             },
         );
     }
-    
+
     #[test]
     fn test_handle_clipboard_internal_richtext() {
+        initialize();
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", Some("richtext")),
@@ -138,9 +154,10 @@ mod tests {
             },
         );
     }
-    
+
     #[test]
     fn test_handle_clipboard_internal_missing_params() {
+        initialize();
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", Some("markdown")),
@@ -152,7 +169,7 @@ mod tests {
                 assert_eq!(result, None);
             },
         );
-        
+
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", Some("markdown")),
@@ -165,9 +182,10 @@ mod tests {
             },
         );
     }
-    
+
     #[test]
     fn test_handle_clipboard_internal_unknown_command() {
+        initialize();
         with_vars(
             [
                 ("ALFRUSCO_COMMAND", Some("unknown")),

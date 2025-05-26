@@ -121,7 +121,10 @@ fn test_alfred_env_provider_with_all_optional_vars() {
             (VAR_PREFERENCES_LOCALHASH, Some("hash123")),
             (VAR_THEME, Some("theme.name")),
             (VAR_THEME_BACKGROUND, Some("rgba(255,255,255,0.98)")),
-            (VAR_THEME_SELECTION_BACKGROUND, Some("rgba(255,255,255,0.98)")),
+            (
+                VAR_THEME_SELECTION_BACKGROUND,
+                Some("rgba(255,255,255,0.98)"),
+            ),
             (VAR_THEME_SUBTEXT, Some("3")),
             (VAR_WORKFLOW_DESCRIPTION, Some("Test Description")),
             (VAR_WORKFLOW_UID, Some("test.uid")),
@@ -131,7 +134,7 @@ fn test_alfred_env_provider_with_all_optional_vars() {
             let provider = AlfredEnvProvider;
             let result = provider.config();
             assert!(result.is_ok());
-            
+
             let config = result.unwrap();
             assert_eq!(config.workflow_bundleid, "com.test.workflow");
             assert_eq!(config.workflow_cache, PathBuf::from("/made/up/cache_dir"));
@@ -139,17 +142,26 @@ fn test_alfred_env_provider_with_all_optional_vars() {
             assert_eq!(config.version, "5.0");
             assert_eq!(config.version_build, "2058");
             assert_eq!(config.workflow_name, "Test Workflow");
-            
+
             // Optional fields
             assert!(config.debug);
             assert_eq!(config.workflow_version, Some("1.0".to_string()));
             assert_eq!(config.preferences, Some("/path/to/prefs".to_string()));
             assert_eq!(config.preferences_localhash, Some("hash123".to_string()));
             assert_eq!(config.theme, Some("theme.name".to_string()));
-            assert_eq!(config.theme_background, Some("rgba(255,255,255,0.98)".to_string()));
-            assert_eq!(config.theme_selection_background, Some("rgba(255,255,255,0.98)".to_string()));
+            assert_eq!(
+                config.theme_background,
+                Some("rgba(255,255,255,0.98)".to_string())
+            );
+            assert_eq!(
+                config.theme_selection_background,
+                Some("rgba(255,255,255,0.98)".to_string())
+            );
             assert_eq!(config.theme_subtext, Some("3".to_string()));
-            assert_eq!(config.workflow_description, Some("Test Description".to_string()));
+            assert_eq!(
+                config.workflow_description,
+                Some("Test Description".to_string())
+            );
             assert_eq!(config.workflow_uid, Some("test.uid".to_string()));
             assert_eq!(config.workflow_keyword, Some("test".to_string()));
         },
@@ -174,7 +186,7 @@ fn test_alfred_env_provider_debug_false() {
             let provider = AlfredEnvProvider;
             let result = provider.config();
             assert!(result.is_ok());
-            
+
             let config = result.unwrap();
             assert!(!config.debug);
         },
@@ -185,10 +197,10 @@ fn test_alfred_env_provider_debug_false() {
 fn test_testing_provider_paths() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path().to_path_buf();
-    
+
     let provider = TestingProvider(temp_path.clone());
     let config = provider.config().unwrap();
-    
+
     // Check that the paths are correctly set
     assert_eq!(config.workflow_cache, temp_path.join("workflow_cache"));
     assert_eq!(config.workflow_data, temp_path.join("workflow_data"));
@@ -198,13 +210,13 @@ fn test_testing_provider_paths() {
 fn test_workflow_config_clone() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path().to_path_buf();
-    
+
     let provider = TestingProvider(temp_path);
     let config = provider.config().unwrap();
-    
+
     // Test that we can clone the config
     let cloned_config = config.clone();
-    
+
     // Verify the clone has the same values
     assert_eq!(config.workflow_bundleid, cloned_config.workflow_bundleid);
     assert_eq!(config.workflow_cache, cloned_config.workflow_cache);

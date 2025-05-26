@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 
-use crate::config::WorkflowConfig;
+use crate::config::{ConfigProvider, WorkflowConfig};
 use crate::error::Result;
-use crate::item::Item;
+use crate::item::{Item};
 use crate::response::Response;
+use crate::clipboard::handle_clipboard;
+use crate::sort_and_filter::filter_and_sort_items;
 
 /// Workflow represents an active execution of an Alfred workflow.
 ///
@@ -74,9 +76,62 @@ impl Workflow {
     }
 }
 
+/// Sets up a workflow using the provided configuration provider.
+/// 
+/// This function:
+/// 1. Handles clipboard operations
+/// 2. Loads configuration from the provider
+/// 3. Creates a new workflow instance
+/// 
+/// # Panics
+/// 
+/// This function will panic if:
+/// - The configuration cannot be loaded
+/// - The workflow cannot be created
+pub fn setup_workflow(provider: &dyn ConfigProvider) -> Workflow {
+    handle_clipboard();
+    let config = provider.config();
+    if config.is_err() {
+        eprintln!("Error loading config: {}", config.unwrap_err());
+        std::process::exit(1);
+    }
+    match Workflow::new(config.unwrap()) {
+        Ok(workflow) => workflow,
+        Err(e) => {
+            eprintln!("Error creating workflow: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Finalizes a workflow by applying filtering if needed and writing the response.
+/// 
+/// This function:
+/// 1. Applies filtering and sorting if enabled
+/// 2. Writes the response to the provided writer
+/// 
+/// # Panics
+/// 
+/// This function will panic if the response cannot be written to the writer.
+pub fn finalize_workflow(mut workflow: Workflow, writer: &mut dyn std::io::Write) {
+    if workflow.sort_and_filter_results {
+        if let Some(keyword) = workflow.keyword.clone() {
+            workflow.response.items = filter_and_sort_items(workflow.response.items, keyword);
+        }
+    }
+    match workflow.response.write(writer) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error writing response: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::TempDir;
+    use std::io::Cursor;
 
     use super::*;
     use crate::config::{self, ConfigProvider};
@@ -168,5 +223,81 @@ mod tests {
         assert_eq!(workflow.response.items[0].title, "First Item");
         assert_eq!(workflow.response.items[3].title, "Appended Item 1");
         assert_eq!(workflow.response.items[5].title, "Appended Item 3");
+    }
+    
+    #[test]
+    fn test_finalize_workflow_with_filtering() {
+        let (mut workflow, _dir) = test_workflow();
+        
+        // Add some items
+        workflow.items(vec![
+            Item::new("Apple").subtitle("Fruit"),
+            Item::new("Banana").subtitle("Fruit"),
+            Item::new("Carrot").subtitle("Vegetable"),
+        ]);
+        
+        // Enable filtering
+        workflow.set_filter_keyword("fruit".to_string());
+        
+        // Create a buffer to capture the output
+        let mut buffer = Cursor::new(Vec::new());
+        
+        // Finalize the workflow
+        finalize_workflow(workflow, &mut buffer);
+        
+        // Get the output as a string
+        let output = String::from_utf8(buffer.into_inner()).unwrap();
+        
+        // Verify filtering was applied (only fruit items should be included)
+        assert!(output.contains("Apple"));
+        assert!(output.contains("Banana"));
+        assert!(!output.contains("Carrot"));
+    }
+    
+    #[test]
+    fn test_finalize_workflow_without_filtering() {
+        let (mut workflow, _dir) = test_workflow();
+        
+        // Add some items
+        workflow.items(vec![
+            Item::new("Apple").subtitle("Fruit"),
+            Item::new("Banana").subtitle("Fruit"),
+            Item::new("Carrot").subtitle("Vegetable"),
+        ]);
+        
+        // Don't enable filtering (sort_and_filter_results remains false)
+        
+        // Create a buffer to capture the output
+        let mut buffer = Cursor::new(Vec::new());
+        
+        // Finalize the workflow
+        finalize_workflow(workflow, &mut buffer);
+        
+        // Get the output as a string
+        let output = String::from_utf8(buffer.into_inner()).unwrap();
+        
+        // Verify all items are included (no filtering)
+        assert!(output.contains("Apple"));
+        assert!(output.contains("Banana"));
+        assert!(output.contains("Carrot"));
+    }
+    
+    #[test]
+    fn test_setup_workflow() {
+        // Create a test config provider
+        let dir = tempfile::tempdir().unwrap().keep();
+        let provider = config::TestingProvider(dir);
+        
+        // Set up the workflow
+        let workflow = setup_workflow(&provider);
+        
+        // Verify the workflow was created correctly
+        assert_eq!(workflow.response.items.len(), 0);
+        assert_eq!(workflow.keyword, None);
+        assert!(!workflow.sort_and_filter_results);
+        
+        // Verify the directories were created
+        assert!(provider.0.join("workflow_data").exists());
+        assert!(provider.0.join("workflow_cache").exists());
     }
 }

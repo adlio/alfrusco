@@ -8,25 +8,25 @@ use crate::Item;
 pub enum Error {
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Fmt Error: {0}")]
     Fmt(#[from] std::fmt::Error),
-    
+
     #[error("FromUtf8 Error: {0}")]
     FromUtf8(#[from] std::string::FromUtf8Error),
-    
+
     #[error("ParseIntError: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
-    
+
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
-    
+
     #[error("Var Error: {0}")]
     Var(#[from] std::env::VarError),
-    
+
     #[error("Missing environment variable: {0}")]
     MissingEnvVar(String),
-    
+
     #[error("Workflow Error: {0}")]
     Workflow(String),
 }

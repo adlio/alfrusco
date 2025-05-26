@@ -1,43 +1,13 @@
 use std::collections::HashMap;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use serde::Serialize;
 
-mod arg;
-pub mod icon;
-mod modifiers;
-mod text;
-
-pub use arg::Arg;
-pub use icon::Icon;
-pub use modifiers::{Key, Modifier};
-pub use text::Text;
-
-pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
-    let matcher = SkimMatcherV2::default();
-
-    let mut filtered_items: Vec<(Item, i64)> = items
-        .into_iter()
-        .filter_map(|item| {
-            let subtitle = item.subtitle.as_deref().unwrap_or_default();
-            let combined = format!("{} : {}", subtitle, item.title);
-            matcher
-                .fuzzy_match(&combined, &query)
-                .map(|score| (item, score))
-        })
-        .collect();
-
-    // Sort by score in descending order
-    filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
-
-    filtered_items.into_iter().map(|(item, _)| item).collect()
-}
+pub use crate::{Arg, Icon, Modifier, Text};
 
 /// Item represents a single choice in the Alfred selection UI.
 ///
 /// The fields here are designed around the Script Filter JSON format defined
-/// on the Alfred web site:
+/// on the Alfred website:
 ///
 /// (https://www.alfredapp.com/help/workflows/inputs/script-filter/json/).
 ///
@@ -186,7 +156,7 @@ impl Item {
         self.sticky = is_sticky;
         self
     }
-    
+
     #[cfg(test)]
     pub(crate) fn test_helper_get_sticky(&self) -> bool {
         self.sticky
@@ -195,80 +165,10 @@ impl Item {
 
 #[cfg(test)]
 mod tests {
-
     use serde_json::json;
 
     use super::*;
     use crate::ICON_TOOLBAR_FAVORITES;
-    
-    #[test]
-    fn test_filter_and_sort_items_basic_matching() {
-        let items = vec![
-            Item::new("Apple").subtitle("Fruit"),
-            Item::new("Banana").subtitle("Fruit"),
-            Item::new("Carrot").subtitle("Vegetable"),
-        ];
-        
-        // Should match "Apple" and "Banana" as they contain "fruit"
-        let result = filter_and_sort_items(items.clone(), "fruit".to_string());
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().any(|item| item.title == "Apple"));
-        assert!(result.iter().any(|item| item.title == "Banana"));
-        
-        // Should match only "Carrot" as it contains "vegetable"
-        let result = filter_and_sort_items(items.clone(), "vegetable".to_string());
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].title, "Carrot");
-        
-        // Should match nothing with this query
-        let result = filter_and_sort_items(items, "meat".to_string());
-        assert_eq!(result.len(), 0);
-    }
-    
-    #[test]
-    fn test_filter_and_sort_items_sorting_order() {
-        let items = vec![
-            Item::new("Zebra").subtitle("Animal"),
-            Item::new("Antelope").subtitle("Animal"),
-            Item::new("Zebra fish").subtitle("Fish"),
-        ];
-        
-        // Both "Zebra" items should match for "zebra"
-        let result = filter_and_sort_items(items.clone(), "zebra".to_string());
-        assert_eq!(result.len(), 2);
-        // Just verify both zebra items are in the results, order depends on fuzzy matching algorithm
-        assert!(result.iter().any(|item| item.title == "Zebra"));
-        assert!(result.iter().any(|item| item.title == "Zebra fish"));
-        
-        // All should match "a" but we don't assert specific order
-        let result = filter_and_sort_items(items, "a".to_string());
-        assert_eq!(result.len(), 3);
-        // Just verify all items are in the results
-        assert!(result.iter().any(|item| item.title == "Zebra"));
-        assert!(result.iter().any(|item| item.title == "Antelope"));
-        assert!(result.iter().any(|item| item.title == "Zebra fish"));
-    }
-    
-    #[test]
-    fn test_filter_and_sort_items_fuzzy_matching() {
-        let items = vec![
-            Item::new("Configuration").subtitle("Settings"),
-            Item::new("Profile").subtitle("User settings"),
-            Item::new("Preferences").subtitle("App config"),
-        ];
-        
-        // Should match all items containing "config" in title or subtitle
-        let result = filter_and_sort_items(items.clone(), "config".to_string());
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().any(|item| item.title == "Configuration"));
-        assert!(result.iter().any(|item| item.title == "Preferences"));
-        
-        // Should match items with "settings" in subtitle
-        let result = filter_and_sort_items(items, "settings".to_string());
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().any(|item| item.title == "Configuration"));
-        assert!(result.iter().any(|item| item.title == "Profile"));
-    }
 
     #[test]
     fn test_arg() {
@@ -358,54 +258,54 @@ mod tests {
         assert_eq!(icon.type_.unwrap(), "filetype");
         assert_eq!(icon.path, "com.adobe.pdf");
     }
-    
+
     #[test]
     fn test_var_and_unset_var() {
         // First, add a variable
         let item = Item::new("Test Item")
             .var("key1", "value1")
             .var("key2", "value2");
-        
+
         // Verify both variables are set
         assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
         assert_eq!(item.variables.get("key2"), Some(&"value2".to_string()));
-        
+
         // Now unset one variable
         let item = item.unset_var("key1");
-        
+
         // Verify key1 is removed but key2 remains
         assert_eq!(item.variables.get("key1"), None);
         assert_eq!(item.variables.get("key2"), Some(&"value2".to_string()));
     }
-    
+
     #[test]
     fn test_unset_var_nonexistent_key() {
         // Create an item with one variable
         let item = Item::new("Test Item").var("key1", "value1");
-        
+
         // Verify the variable is set
         assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
-        
+
         // Try to unset a variable that doesn't exist
         let item = item.unset_var("nonexistent_key");
-        
+
         // Verify the original variable is still there
         assert_eq!(item.variables.get("key1"), Some(&"value1".to_string()));
-        
+
         // Verify the HashMap size hasn't changed
         assert_eq!(item.variables.len(), 1);
     }
-    
+
     #[test]
     fn test_var_and_unset_var_serialization() {
         // Create an item with variables
         let item = Item::new("Test Item")
             .var("key1", "value1")
             .var("key2", "value2");
-        
+
         // Serialize to JSON
         let json = serde_json::to_value(&item).unwrap();
-        
+
         // Verify variables are included in the JSON
         let expected = json!({
             "title": "Test Item",
@@ -415,13 +315,13 @@ mod tests {
             }
         });
         assert_eq!(json, expected);
-        
+
         // Unset a variable
         let item = item.unset_var("key1");
-        
+
         // Serialize to JSON again
         let json = serde_json::to_value(&item).unwrap();
-        
+
         // Verify the updated variables are in the JSON
         let expected = json!({
             "title": "Test Item",
@@ -430,34 +330,34 @@ mod tests {
             }
         });
         assert_eq!(json, expected);
-        
+
         // Unset the last variable
         let item = item.unset_var("key2");
-        
+
         // Serialize to JSON again
         let json = serde_json::to_value(&item).unwrap();
-        
+
         // Verify variables field is omitted when empty
         let expected = json!({
             "title": "Test Item"
         });
         assert_eq!(json, expected);
     }
-    
+
     #[test]
     fn test_sticky() {
         // Default should be false
         let item = Item::new("Test Item");
         assert!(!item.test_helper_get_sticky());
-        
+
         // Set to true
         let item = item.sticky(true);
         assert!(item.test_helper_get_sticky());
-        
+
         // Set back to false
         let item = item.sticky(false);
         assert!(!item.test_helper_get_sticky());
-        
+
         // Verify sticky is not serialized (it's marked with skip_serializing)
         let json = serde_json::to_value(&item).unwrap();
         let expected = json!({

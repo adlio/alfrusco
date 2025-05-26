@@ -19,7 +19,7 @@ clean:
 	cargo llvm-cov clean
 
 coverage: check-llvm-cov
-	cargo llvm-cov --all-features --examples --tests
+	cargo llvm-cov --all-features --examples --tests --show-missing-lines
 
 coverage-html: check-llvm-cov
 	cargo llvm-cov --all-features --examples --tests --html --open

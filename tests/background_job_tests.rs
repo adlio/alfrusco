@@ -1,8 +1,6 @@
-use std::fs::{self, create_dir_all};
-use std::path::{Path};
+use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
-use std::thread;
 
 use alfrusco::config::WorkflowConfig;
 use alfrusco::Workflow;
@@ -56,9 +54,9 @@ fn test_background_job_fresh() {
 
     // Create the job directory and a last_run file manually
     let job_dir = temp_path.join("jobs").join("fresh_job");
-    create_dir_all(&job_dir).unwrap();
+    std::fs::create_dir_all(&job_dir).unwrap();
     let last_run_file = job_dir.join("job.last_run");
-    fs::write(&last_run_file, "2023-01-01T00:00:00Z").unwrap();
+    std::fs::write(&last_run_file, "2023-01-01T00:00:00Z").unwrap();
 
     // Set the file's modified time to now
     let now = std::time::SystemTime::now();
@@ -126,7 +124,7 @@ fn test_background_job_running_process() {
     assert!(pid_file.exists());
 
     // Wait a short time to ensure the process has started
-    thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(100));
 
     // Run the job again - this should detect the running process and not start a new one
     let mut cmd2 = Command::new("echo");
@@ -134,14 +132,14 @@ fn test_background_job_running_process() {
     workflow.run_in_background("running_job", Duration::from_secs(3600), cmd2);
 
     // Read the PID file content from the first run
-    let pid_content = fs::read_to_string(&pid_file).unwrap();
-    
+    let pid_content = std::fs::read_to_string(&pid_file).unwrap();
+
     // Verify the PID file wasn't changed (the second command wasn't executed)
-    let new_pid_content = fs::read_to_string(&pid_file).unwrap();
+    let new_pid_content = std::fs::read_to_string(&pid_file).unwrap();
     assert_eq!(pid_content, new_pid_content);
 
     // Wait for the process to complete
-    thread::sleep(Duration::from_secs(2));
+    std::thread::sleep(Duration::from_secs(2));
 }
 
 #[test]
@@ -155,9 +153,9 @@ fn test_background_job_stale_with_previous_runs() {
 
     // Create the job directory and a last_run file manually
     let job_dir = temp_path.join("jobs").join("stale_job");
-    create_dir_all(&job_dir).unwrap();
+    std::fs::create_dir_all(&job_dir).unwrap();
     let last_run_file = job_dir.join("job.last_run");
-    fs::write(&last_run_file, "2023-01-01T00:00:00Z").unwrap();
+    std::fs::write(&last_run_file, "2023-01-01T00:00:00Z").unwrap();
 
     // Set the file's modified time to a time in the past (1 day ago)
     let one_day_ago = std::time::SystemTime::now() - Duration::from_secs(86400);
@@ -180,12 +178,12 @@ fn test_background_job_stale_with_previous_runs() {
     assert!(pid_file.exists());
 
     // Sleep briefly to allow the process to complete
-    thread::sleep(Duration::from_millis(100));
+    std::thread::sleep(Duration::from_millis(100));
 
     // Verify that the last_run file was updated
-    let metadata = fs::metadata(&last_run_file).unwrap();
+    let metadata = std::fs::metadata(&last_run_file).unwrap();
     let _last_modified = metadata.modified().unwrap();
-    
+
     // The last_run file should be newer than our one_day_ago timestamp
     // Note: On some filesystems, the timestamp precision might cause this to fail
     // So we'll just check that the file exists instead
