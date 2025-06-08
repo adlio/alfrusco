@@ -1,15 +1,46 @@
-use std::fs::{self, create_dir_all, read_to_string, write, File, FileTimes};
+use std::collections::hash_map::DefaultHasher;
+use std::fs::{self, create_dir_all, read_to_string, write};
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use chrono::{DateTime, Utc};
+// chrono imports removed - no longer needed for last_run file management
 use humantime::format_duration;
 use log::{debug, error, info};
 use sysinfo::System;
 
 use crate::workflow::Workflow;
-use crate::{Item, Result, ICON_CLOCK};
+use crate::{
+    Item, Result, ICON_ACTIONS, ICON_ALERT_STOP, ICON_CLOCK, ICON_GENERIC_QUESTION_MARK, ICON_SYNC,
+};
+
+/// Escapes a string for safe use in shell commands
+/// This function properly quotes arguments that contain spaces, quotes, or other special characters
+fn shell_escape(s: &str) -> String {
+    // If the string is empty, return empty quotes
+    if s.is_empty() {
+        return "''".to_string();
+    }
+
+    // If the string contains no special characters, return as-is
+    if s.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/')
+    {
+        return s.to_string();
+    }
+
+    // Otherwise, wrap in single quotes and escape any single quotes within
+    format!("'{}'", s.replace('\'', "'\"'\"'"))
+}
+
+/// Creates a filesystem-safe hash from a job name
+fn create_job_id(name: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    name.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("{hash:x}")
+}
 
 pub type RunDuration = Duration;
 pub type Staleness = Duration;
@@ -34,8 +65,11 @@ pub enum BackgroundJobStatus {
 }
 
 pub(crate) struct BackgroundJob<'a> {
-    /// The unique identifier/name for this background job
-    id: &'a str,
+    /// The human-readable name for this background job
+    name: &'a str,
+
+    /// The unique identifier for this background job (hash of name)
+    id: String,
 
     /// The maximum time allowed since the job was last run
     /// before it is considered stale and we re-run it.
@@ -63,7 +97,8 @@ impl<'a> BackgroundJob<'a> {
         command.stderr(std::process::Stdio::inherit());
         BackgroundJob {
             workflow,
-            id: name,
+            name,
+            id: create_job_id(name),
             max_age,
             command,
         }
@@ -78,52 +113,61 @@ impl<'a> BackgroundJob<'a> {
                 Fresh(staleness) => {
                     debug!(
                         "Job '{}' is fresh, last run {}",
-                        self.id,
+                        self.name,
                         format_duration(staleness)
                     );
                     None
                 }
-                Stale(staleness, duration) => match staleness {
-                    Some(staleness) => {
-                        debug!(
-                            "Job '{}' is stale. Last run {} ago, running for {}",
-                            self.id,
-                            format_duration(staleness),
-                            format_duration(duration),
-                        );
-                        // Truncate to milliseconds
-                        let staleness = Duration::from_millis(staleness.as_millis() as u64);
-                        let duration = Duration::from_millis(duration.as_millis() as u64);
-                        let stale_item = Item::new(format!("Background Job '{}'", self.id))
-                            .subtitle(format!(
-                                "Job is stale by {}, running for {}",
+                Stale(staleness, duration) => {
+                    // Get the last execution status to provide better user feedback
+                    let last_status = self.get_job_status();
+
+                    match staleness {
+                        Some(staleness) => {
+                            debug!(
+                                "Job '{}' is stale. Last run {} ago, running for {}",
+                                self.name,
                                 format_duration(staleness),
+                                format_duration(duration),
+                            );
+
+                            // Create more informative subtitle based on last execution status
+                            let subtitle = self.create_status_subtitle(
+                                Some(staleness),
+                                duration,
+                                &last_status,
+                            );
+                            let icon = self.get_status_icon(&last_status, Some(staleness));
+
+                            let stale_item = Item::new(format!("Background Job '{}'", self.name))
+                                .subtitle(subtitle)
+                                .icon(icon)
+                                .valid(false);
+                            Some(stale_item)
+                        }
+                        None => {
+                            debug!(
+                                "Job '{}' has never run before, running for {}",
+                                self.name,
                                 format_duration(duration)
-                            ))
-                            .icon(ICON_CLOCK.into())
-                            .valid(false);
-                        Some(stale_item)
+                            );
+
+                            let subtitle =
+                                self.create_status_subtitle(None, duration, &last_status);
+                            let icon = self.get_status_icon(&last_status, None);
+
+                            let stale_item = Item::new(format!("Background Job '{}'", self.name))
+                                .subtitle(subtitle)
+                                .icon(icon)
+                                .valid(false);
+                            Some(stale_item)
+                        }
                     }
-                    None => {
-                        debug!(
-                            "Job '{}' has never run before, running for {}",
-                            self.id,
-                            format_duration(duration)
-                        );
-                        let stale_item = Item::new(format!("Background Job '{}'", self.id))
-                            .subtitle(format!(
-                                "Job is stale, running for {}",
-                                format_duration(duration)
-                            ))
-                            .icon(ICON_CLOCK.into())
-                            .valid(false);
-                        Some(stale_item)
-                    }
-                },
+                }
             },
             Err(e) => {
-                error!("Error starting job '{}': {}", self.id, e);
-                let error_item = Item::new(format!("Background Job '{}'", self.id))
+                error!("Error starting job '{}': {}", self.name, e);
+                let error_item = Item::new(format!("Background Job '{}'", self.name))
                     .subtitle(format!("Error starting job: {e}"));
                 Some(error_item)
             }
@@ -142,14 +186,23 @@ impl<'a> BackgroundJob<'a> {
         // If there's no process running but we have a PID file, it means the process
         // has terminated. We need to check if it was successful or not.
         if run_duration.is_none() && self.pid_file().exists() {
-            debug!("Job '{}' has terminated, checking status", self.id);
+            debug!("Job '{}' has terminated, checking status", self.name);
             self.cleanup()?;
         }
 
-        // Fresh - only if the job was successful previously
+        // Fresh - only if the job was successful previously AND is recent enough
         if let Some(staleness) = staleness {
             if staleness < self.max_age {
-                return Ok(BackgroundJobStatus::Fresh(staleness));
+                // Check if the last run was actually successful
+                let job_status = self.get_job_status();
+                if job_status == JobExecutionStatus::Success {
+                    return Ok(BackgroundJobStatus::Fresh(staleness));
+                }
+                // If the job failed, we should re-run it even if it's recent
+                debug!(
+                    "Job '{}' is recent but failed (status: {:?}), treating as stale to allow retry",
+                    self.name, job_status
+                );
             }
         }
 
@@ -186,8 +239,9 @@ impl<'a> BackgroundJob<'a> {
         }
     }
 
-    /// Creates and runs a monitor script that will execute the command and update the status file
-    /// based on the exit code. This script continues running even after the main process exits.
+    /// Spawns a bash command that executes the target command and handles success/failure status
+    /// reporting. This approach is secure because we don't write environment variables to disk,
+    /// and efficient because we don't need monitoring threads.
     fn create_and_run_monitor_script(&self) -> Result<u32> {
         // For non-existent commands, we should fail early
         if let Some(program) = self.command.get_program().to_str() {
@@ -196,83 +250,51 @@ impl<'a> BackgroundJob<'a> {
             }
         }
 
-        // Create a temporary script file
-        let script_path = self.job_dir().join("monitor.sh");
-        let cmd_str = format!("{:?}", self.command);
+        // Build the command arguments with proper shell escaping
+        let program = self.command.get_program();
+        let args: Vec<_> = self.command.get_args().collect();
 
-        // Extract the command and arguments
-        let cmd_parts: Vec<&str> = cmd_str
-            .trim_start_matches('"')
-            .trim_end_matches('"')
-            .split(' ')
-            .collect();
-
-        if cmd_parts.is_empty() {
-            return Err("Empty command".into());
+        let mut cmd_parts = vec![shell_escape(program.to_string_lossy().as_ref())];
+        for arg in args {
+            cmd_parts.push(shell_escape(arg.to_string_lossy().as_ref()));
         }
+        let cmd_string = cmd_parts.join(" ");
 
-        // Build the command string with proper escaping
-        let cmd_exec = cmd_parts.join(" ");
-
-        // Create the monitor script content - using macOS-specific approach
-        let script_content = format!(
-            r#"#!/bin/bash
-# Monitor script for job '{}'
-# This script executes the command and updates the status file based on the exit code
-
-# Run the command in the background and detach it
-(
-  # Execute the command and capture output to log file
-  {} > "{}/job.logs" 2>&1
-  
-  # Check the exit code
-  EXIT_CODE=$?
-  if [ $EXIT_CODE -eq 0 ]; then
-    echo "success" > "{}/job.status"
-  else
-    echo "failed" > "{}/job.status"
-  fi
-) &
-
-# Detach the process
-disown
-
-# Exit successfully since we've launched the background process
-exit 0
-"#,
-            self.id,
-            cmd_exec,
-            self.job_dir().display(),
-            self.job_dir().display(),
-            self.job_dir().display()
+        // Create a bash command that:
+        // 1. Executes the target command with output redirection
+        // 2. Checks the exit code and writes status
+        // 3. Always updates the last_run file (regardless of success/failure)
+        // 4. Runs completely detached
+        let bash_command = format!(
+            r#"({} > "{}" 2>&1; if [ $? -eq 0 ]; then echo "success" > "{}"; else echo "failed" > "{}"; fi; touch "{}") &"#,
+            cmd_string,
+            self.job_dir().join("job.logs").display(),
+            self.job_dir().join("job.status").display(),
+            self.job_dir().join("job.status").display(),
+            self.job_dir().join("job.last_run").display()
         );
 
-        // Write the script to a file
-        fs::write(&script_path, script_content)?;
+        // Spawn the bash command with inherited environment
+        let mut cmd = Command::new("/bin/bash");
+        cmd.arg("-c");
+        cmd.arg(&bash_command);
 
-        // Make the script executable
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&script_path)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&script_path, perms)?;
-        }
+        // Inherit the current environment (including Alfred environment variables)
+        // This is crucial for commands that depend on Alfred's environment
+        cmd.envs(std::env::vars());
 
-        // Execute the script
-        let mut monitor_cmd = Command::new("/bin/bash");
-        monitor_cmd.arg(&script_path);
-        monitor_cmd.stdout(std::process::Stdio::null());
-        monitor_cmd.stderr(std::process::Stdio::null());
+        // Detach completely - no stdout/stderr capture needed
+        cmd.stdout(std::process::Stdio::null());
+        cmd.stderr(std::process::Stdio::null());
 
-        let child = monitor_cmd.spawn()?;
+        let child = cmd.spawn()?;
         let pid = child.id();
 
         Ok(pid)
     }
 
     fn job_dir(&self) -> PathBuf {
-        self.workflow.jobs_dir().join(self.id)
+        self.workflow.jobs_dir().join(&self.id)
     }
 
     fn pid_file(&self) -> PathBuf {
@@ -285,6 +307,96 @@ exit 0
 
     fn status_file(&self) -> PathBuf {
         self.job_dir().join("job.status")
+    }
+
+    /// Creates an informative subtitle for the background job status item
+    fn create_status_subtitle(
+        &self,
+        staleness: Option<Duration>,
+        running_duration: Duration,
+        current_status: &JobExecutionStatus,
+    ) -> String {
+        use JobExecutionStatus::*;
+
+        let running_info = format!("running for {}", format_duration(running_duration));
+
+        match (staleness, current_status) {
+            // Job has run before - we now always have timing info since we always update last_run
+            (Some(staleness), Success) => {
+                let last_run_formatted = self.format_last_run_time_from_staleness(staleness);
+                format!(
+                    "Last succeeded {} ago ({}), {}",
+                    format_duration(staleness),
+                    last_run_formatted,
+                    running_info
+                )
+            }
+            (Some(staleness), Failed) => {
+                let last_run_formatted = self.format_last_run_time_from_staleness(staleness);
+                format!(
+                    "Last failed {} ago ({}), {}",
+                    format_duration(staleness),
+                    last_run_formatted,
+                    running_info
+                )
+            }
+            (Some(staleness), Running) => {
+                // When status is "running", we need to infer what happened before.
+                // If we're here showing a status item, it means the job is being re-run
+                // despite having a recent last_run file. This only happens for failed jobs.
+                let last_run_formatted = self.format_last_run_time_from_staleness(staleness);
+                format!(
+                    "Last ran {} ago ({}), {}",
+                    format_duration(staleness),
+                    last_run_formatted,
+                    running_info
+                )
+            }
+            (Some(staleness), Unknown) => {
+                format!(
+                    "Last run {} ago (status unknown), {}",
+                    format_duration(staleness),
+                    running_info
+                )
+            }
+            // First time running - this should now be rare since we always update last_run
+            (None, _) => {
+                format!("First run, {running_info}")
+            }
+        }
+    }
+
+    /// Formats the last run time in a human-readable way using staleness duration
+    fn format_last_run_time_from_staleness(&self, staleness: Duration) -> String {
+        let now = chrono::Utc::now();
+        let last_run_chrono = now - chrono::Duration::from_std(staleness).unwrap_or_default();
+        last_run_chrono.format("%H:%M:%S").to_string()
+    }
+
+    /// Gets the appropriate icon based on the execution context
+    fn get_status_icon(
+        &self,
+        status: &JobExecutionStatus,
+        staleness: Option<Duration>,
+    ) -> crate::Icon {
+        use JobExecutionStatus::*;
+        match status {
+            Success => ICON_ACTIONS.into(), // Actions icon for successful completion
+            Failed => ICON_ALERT_STOP.into(), // Stop/error icon for failure
+            Running => {
+                // For running jobs, provide context-aware icons
+                if let Some(_staleness) = staleness {
+                    // Job is running and we have a previous run
+                    // If we're showing a status item, it means this is a retry
+                    // The only reason to retry despite recent last_run is failure
+                    ICON_SYNC.into() // Sync icon for retry after failure
+                } else {
+                    // First time running
+                    ICON_CLOCK.into() // Clock for first run
+                }
+            }
+            Unknown => ICON_GENERIC_QUESTION_MARK.into(), // Question mark for unknown
+        }
     }
 
     fn get_pid(&self) -> Result<u32> {
@@ -337,39 +449,16 @@ exit 0
     fn cleanup(&self) -> Result<()> {
         match fs::metadata(self.pid_file()) {
             Ok(metadata) => {
-                let last_run_systime = metadata.modified().unwrap();
+                let _last_run_systime = metadata.modified().unwrap();
 
-                // Check if the job was successful before updating last_run_file
-                let job_status = self.get_job_status();
-                if job_status == JobExecutionStatus::Success {
-                    info!(
-                        "Job '{}' completed successfully, updating last_run_file",
-                        self.id
-                    );
-                    let last_run_date = DateTime::<Utc>::from(last_run_systime);
-                    write(self.last_run_file(), last_run_date.to_rfc3339())?;
-                    let dest = File::options().write(true).open(self.last_run_file())?;
-                    let times = FileTimes::new()
-                        .set_accessed(last_run_systime)
-                        .set_modified(last_run_systime);
-                    dest.set_times(times)?;
-                } else if job_status == JobExecutionStatus::Failed {
-                    info!(
-                        "Job '{}' failed, not updating last_run_file to allow retry",
-                        self.id
-                    );
-                    // Delete the last_run_file if it exists to ensure the job is considered stale
-                    if self.last_run_file().exists() {
-                        let _ = fs::remove_file(self.last_run_file());
-                    }
-                } else {
-                    // For unknown status, we assume failure to be safe
-                    info!("Job '{}' has unknown status, treating as failed", self.id);
-                    // Delete the last_run_file if it exists to ensure the job is considered stale
-                    if self.last_run_file().exists() {
-                        let _ = fs::remove_file(self.last_run_file());
-                    }
-                }
+                // The job has completed (successfully or not)
+                // The bash command already created the job.last_run file via 'touch'
+                // so we don't need to do any additional last_run file management here
+                info!(
+                    "Job '{}' completed with status: {:?}",
+                    self.name,
+                    self.get_job_status()
+                );
 
                 self.delete_pid_file()?;
                 Ok(())

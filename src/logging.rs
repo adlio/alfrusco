@@ -42,8 +42,11 @@ use crate::Error;
 /// ```
 pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), Error> {
     // Get the workflow configuration - fail if this doesn't work
-    let config = provider.config()
-        .map_err(|e| Error::Config(format!("Failed to get workflow configuration for logging: {}", e)))?;
+    let config = provider.config().map_err(|e| {
+        Error::Config(format!(
+            "Failed to get workflow configuration for logging: {e}"
+        ))
+    })?;
 
     // Set up log file path in the workflow cache directory
     let log_file_path = config.workflow_cache.join("workflow.log");
@@ -80,7 +83,9 @@ pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), Error> {
                 .chain(std::io::stderr())
                 .level(LevelFilter::Debug)
                 .apply()
-                .map_err(|e| Error::Logging(format!("Failed to initialize stderr-only logger: {}", e)));
+                .map_err(|e| {
+                    Error::Logging(format!("Failed to initialize stderr-only logger: {e}"))
+                });
         }
     };
 
@@ -112,5 +117,5 @@ pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), Error> {
         .level(LevelFilter::Debug)
         // Apply configuration
         .apply()
-        .map_err(|e| Error::Logging(format!("Failed to initialize logger: {}", e)))
+        .map_err(|e| Error::Logging(format!("Failed to initialize logger: {e}")))
 }

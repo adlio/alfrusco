@@ -1,39 +1,17 @@
+mod common;
+
 use std::process::Command;
 use std::time::Duration;
 
-use alfrusco::config::{ConfigProvider, WorkflowConfig};
-use alfrusco::{config, Workflow};
-use tempfile::TempDir;
+use alfrusco::config;
+use alfrusco::config::ConfigProvider;
+use common::{create_job_id, create_test_workflow_with_temp};
 
 /// Test that simulates a command that fails to spawn
 #[test]
 fn test_background_job_command_spawn_error() {
-    // Create a temporary directory for the test
-    let temp_dir = TempDir::new().unwrap();
-    let temp_path = temp_dir.path().to_path_buf();
-
-    // Create a workflow with the temp directory as cache
-    let config = WorkflowConfig {
-        preferences: Some("/Users/Test/Alfred.alfredpreferences".to_string()),
-        preferences_localhash: Some("test123".to_string()),
-        theme: Some("alfred.theme.test".to_string()),
-        theme_background: Some("rgba(255,255,255,0.98)".to_string()),
-        theme_selection_background: Some("rgba(255,255,255,0.98)".to_string()),
-        theme_subtext: Some("3".to_string()),
-        version: "5.0".to_string(),
-        version_build: "2058".to_string(),
-        workflow_bundleid: "com.test.workflow".to_string(),
-        workflow_cache: temp_path.clone(),
-        workflow_data: temp_path.clone(),
-        workflow_name: "Test Workflow".to_string(),
-        workflow_description: Some("Test workflow description".to_string()),
-        workflow_version: Some("1.0".to_string()),
-        workflow_uid: Some("test.workflow.123".to_string()),
-        workflow_keyword: None,
-        debug: true,
-    };
-
-    let mut workflow = Workflow::new(config).expect("Failed to create workflow");
+    let (mut workflow, temp_dir) = create_test_workflow_with_temp();
+    let temp_path = temp_dir.path();
 
     // Create a command that will fail to spawn
     let cmd = Command::new("non_existent_command_that_definitely_does_not_exist");
@@ -42,7 +20,7 @@ fn test_background_job_command_spawn_error() {
     workflow.run_in_background("error_job", Duration::from_secs(0), cmd);
 
     // The job directory should have been created
-    let job_dir = temp_path.join("jobs").join("error_job");
+    let job_dir = temp_path.join("jobs").join(create_job_id("error_job"));
     assert!(job_dir.exists());
 
     // But no PID file should exist

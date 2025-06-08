@@ -13,10 +13,9 @@ impl Workflow {
     ///
     pub fn run_in_background(&mut self, job_key: &str, max_age: Duration, cmd: Command) {
         let mut job = BackgroundJob::new(self, job_key, max_age, cmd);
-        let job_item = job.run();
-        if let Some(item) = job_item {
+        if let Some(item) = job.run() {
+            self.response.append_items(vec![item]);
             self.response.rerun(Duration::from_secs(1));
-            self.response.prepend_items(vec![item]);
         }
     }
 
