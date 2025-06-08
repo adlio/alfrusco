@@ -1,9 +1,10 @@
 use std::fs::File;
 
 use fern::colors::{Color, ColoredLevelConfig};
-use log::{LevelFilter, SetLoggerError};
+use log::LevelFilter;
 
 use crate::config::ConfigProvider;
+use crate::Error;
 
 /// Initializes the default logger for alfrusco.
 ///
@@ -11,38 +12,38 @@ use crate::config::ConfigProvider;
 /// workflow cache directory.
 ///
 /// If a logger is already initialized, this function will return an error.
+/// If the provider configuration fails, this function will also return an error.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - A logger is already initialized
+/// - The provider configuration cannot be retrieved
 ///
 /// # Example
 ///
 /// ```
-/// use alfrusco::{execute, init_logging};
-/// use alfrusco::config::AlfredEnvProvider;
+/// use alfrusco::{execute, init_logging, Error};
+/// use alfrusco::config::TestingProvider;
+/// use tempfile::tempdir;
 ///
-/// // Initialize logging before executing your workflow
-/// let _ = init_logging(&AlfredEnvProvider);
+/// fn main() -> Result<(), Error> {
+///     // For testing, use TestingProvider with a temporary directory
+///     let temp_dir = tempdir().unwrap();
+///     let provider = TestingProvider(temp_dir.path().to_path_buf());
+///     
+///     // Initialize logging before executing your workflow
+///     init_logging(&provider)?;
 ///
-/// // Then execute your workflow
-/// // execute(&AlfredEnvProvider, ...);
+///     // Then execute your workflow
+///     // execute(&provider, ...);
+///     Ok(())
+/// }
 /// ```
-pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), SetLoggerError> {
-    // Get the workflow configuration
-    let config = match provider.config() {
-        Ok(config) => config,
-        Err(e) => {
-            eprintln!("Warning: Could not get workflow configuration: {e}");
-            // We can't create a SetLoggerError directly, so we'll try to set a dummy logger
-            // which will fail if a logger is already set, giving us a SetLoggerError
-            struct DummyLogger;
-            impl log::Log for DummyLogger {
-                fn enabled(&self, _: &log::Metadata) -> bool {
-                    false
-                }
-                fn log(&self, _: &log::Record) {}
-                fn flush(&self) {}
-            }
-            return log::set_logger(&DummyLogger).map(|_| ());
-        }
-    };
+pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), Error> {
+    // Get the workflow configuration - fail if this doesn't work
+    let config = provider.config()
+        .map_err(|e| Error::Config(format!("Failed to get workflow configuration for logging: {}", e)))?;
 
     // Set up log file path in the workflow cache directory
     let log_file_path = config.workflow_cache.join("workflow.log");
@@ -78,7 +79,8 @@ pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), SetLoggerError>
                 })
                 .chain(std::io::stderr())
                 .level(LevelFilter::Debug)
-                .apply();
+                .apply()
+                .map_err(|e| Error::Logging(format!("Failed to initialize stderr-only logger: {}", e)));
         }
     };
 
@@ -110,4 +112,5 @@ pub fn init_logging(provider: &dyn ConfigProvider) -> Result<(), SetLoggerError>
         .level(LevelFilter::Debug)
         // Apply configuration
         .apply()
+        .map_err(|e| Error::Logging(format!("Failed to initialize logger: {}", e)))
 }

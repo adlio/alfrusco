@@ -27,6 +27,12 @@ pub enum Error {
     #[error("Missing environment variable: {0}")]
     MissingEnvVar(String),
 
+    #[error("Configuration Error: {0}")]
+    Config(String),
+
+    #[error("Logging Error: {0}")]
+    Logging(String),
+
     #[error("Workflow Error: {0}")]
     Workflow(String),
 }
