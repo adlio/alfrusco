@@ -210,7 +210,7 @@ impl Runnable for MyWorkflow {
 
 ### Background Jobs
 
-Run long-running tasks without blocking Alfred's UI:
+Run long-running tasks without blocking Alfred's UI with enhanced status tracking and automatic retry logic:
 
 ```rust
 use std::process::Command;
@@ -242,6 +242,34 @@ impl Runnable for MyWorkflow {
         Ok(())
     }
 }
+```
+
+**Enhanced Background Job Features:**
+
+- **Smart Status Tracking**: Jobs show detailed status messages like "Last succeeded 2 minutes ago (14:32:15), running for 3s" or "Last failed 5 minutes ago (14:29:42), running for 1s"
+- **Automatic Retry Logic**: Failed jobs are automatically retried even if they ran recently, ensuring eventual success
+- **Context-Aware Icons**: Visual indicators show job status at a glance:
+  - ✅ Success jobs show completion icon
+  - ❌ Failed jobs show error icon  
+  - 🔄 Retry attempts show sync icon
+  - 🕐 First-time runs show clock icon
+- **Secure Shell Escaping**: Arguments with spaces and special characters are properly escaped for security
+- **Robust Last-Run Tracking**: All job executions are tracked regardless of success/failure for accurate status reporting
+
+**Background Job Status Messages:**
+
+When a background job is running, Alfred will display informative status items:
+
+```
+Background Job 'github-releases'
+Last succeeded 2 minutes ago (14:32:15), running for 3s
+```
+
+This gives users clear visibility into:
+- When the job last ran successfully or failed
+- The exact time of the last execution
+- How long the current execution has been running
+- Visual context through appropriate icons
 ```
 
 ### URL Items with Rich Clipboard Support
@@ -348,7 +376,7 @@ impl Runnable for MyWorkflow {
 
 ## 🧪 Testing
 
-Alfrusco provides comprehensive testing support:
+Alfrusco provides comprehensive testing support with shared utilities and organized test structure:
 
 ```rust
 #[cfg(test)]
@@ -390,6 +418,24 @@ mod tests {
         assert!(output.contains("async"));
     }
 }
+```
+
+### ### Test Organization
+
+Alfrusco maintains a comprehensive test suite with **112 tests** across organized test files:
+
+- **`background_job_integration_tests.rs`** - Complete background job lifecycle testing (6 tests)
+- **`clipboard_tests.rs`** - Clipboard functionality testing (4 tests)  
+- **`config_tests.rs`** - Configuration and environment testing (8 tests)
+- **`error_injection_tests.rs`** - Error handling and edge cases (2 tests)
+- **`error_tests.rs`** - Error type behavior (7 tests)
+- **`logging_tests.rs`** - Logging functionality (1 test)
+- **`runnable_tests.rs`** - Trait implementation testing (4 tests)
+- **`tests/common/mod.rs`** - Shared test utilities and helpers
+
+### Shared Test Utilities
+
+The `tests/common/mod.rs` module provides reusable testing utilities that eliminate code duplication and ensure consistent test setup across the entire test suite. This includes helper functions for creating test workflows, managing temporary directories, and common test operations.
 ```
 
 ## 📚 Examples
