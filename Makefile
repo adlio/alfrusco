@@ -1,3 +1,11 @@
+all: lint coverage
+
+test: check-nextest
+	cargo nextest run --all-targets --all-features --examples
+
+test-without-nextest:
+	cargo test --all-targets --all-features --examples
+
 workflow: release
 	cargo build --all-targets --release && \
 	cp target/release/examples/random_user workflow/ && \
@@ -7,9 +15,6 @@ workflow: release
 
 build:
 	cargo build --all-targets --all-features --examples
-
-test:
-	cargo test --all-targets --all-features --examples
 
 release:
 	cargo build --all-targets --all-features --examples --release
@@ -27,8 +32,7 @@ coverage-html: check-llvm-cov
 coverage-ci: check-llvm-cov
 	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info
 
-check-llvm-cov:
-	@command -v cargo-llvm-cov >/dev/null 2>&1 || { echo "cargo-llvm-cov is not installed. Install it with: cargo install cargo-llvm-cov"; exit 1; }
+lint: fmt clippy
 
 fmt:
 	cargo +nightly fmt --all
@@ -42,6 +46,9 @@ clippy:
 clippy-fix:
 	cargo clippy --all-targets --all-features --examples --fix -- -D warnings
 
-lint: fmt clippy-fix
+check-llvm-cov:
+	@command -v cargo-llvm-cov >/dev/null 2>&1 || { echo "cargo-llvm-cov is not installed. Install it with: cargo install cargo-llvm-cov"; exit 1; }
 
-.PHONY: all test clean coverage coverage-html coverage-ci check-llvm-cov release fmt fmt-check clippy clippy-fix lint
+check-nextest:
+	@command -v cargo-nextest >/dev/null 2>&1 || { echo "cargo-nextest is not installed. Install it with: cargo install cargo-nextest"; exit 1; }
+.PHONY: all test test-without-nextest test-serial test-flaky test-stress clean coverage coverage-html coverage-ci check-llvm-cov check-nextest release fmt fmt-check clippy clippy-fix lint
