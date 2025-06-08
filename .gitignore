@@ -15,4 +15,6 @@ Cargo.lock
 
 tarpaulin-report.html
 
+.idea/aws.xml
+
 spec.md
