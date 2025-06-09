@@ -21,6 +21,7 @@ pub mod internal_handlers;
 pub use arg::Arg;
 pub use error::{Error, Result, WorkflowError};
 pub use icon::*;
+pub use internal_handlers::handle;
 pub use item::Item;
 pub use logging::init_logging;
 pub use modifiers::{Key, Modifier};

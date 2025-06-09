@@ -48,11 +48,13 @@ pub fn create_job_id(name: &str) -> String {
 }
 
 /// Helper to wait for background job completion with timeout
+#[allow(dead_code)]
 pub fn wait_for_job_completion(max_wait_ms: u64) {
     std::thread::sleep(std::time::Duration::from_millis(max_wait_ms));
 }
 
 /// Helper to find a job directory in the jobs folder
+#[allow(dead_code)]
 pub fn find_job_directory(jobs_dir: &Path) -> Option<std::path::PathBuf> {
     if !jobs_dir.exists() {
         return None;

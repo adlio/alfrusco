@@ -1,11 +1,9 @@
 use std::env::var;
-use std::process::Command;
 
-use clipboard::{ClipboardContext, ClipboardProvider};
-use hex::encode;
-use log::{debug, info};
+use arboard::Clipboard;
+use log::{debug, error, info};
 
-use crate::Response;
+use crate::{Error, Response, Result};
 
 /// Handles clipboard operations based on environment variables.
 /// Returns true if a clipboard operation was performed and the process should exit,
@@ -16,19 +14,23 @@ pub fn handle_clipboard() -> bool {
     let url = var("URL").ok();
 
     if let Some(cmd) = cmd {
-        debug!("ALFRUSCO_COMMAND provided. Alfrusco will handle this request");
+        debug!("ALFRUSCO_COMMAND provided: {cmd}");
 
         if cmd == "richtext" || cmd == "markdown" {
             if let (Some(title), Some(url)) = (title, url) {
-                if cmd == "richtext" {
-                    copy_rich_text_link_to_clipboard(title, url);
-                } else if cmd == "markdown" {
-                    copy_markdown_link_to_clipboard(title, url);
+                let result = if cmd == "richtext" {
+                    copy_rich_text_link_to_clipboard(title, url)
+                } else {
+                    copy_markdown_link_to_clipboard(title, url)
+                };
+
+                if let Err(e) = result {
+                    error!("Clipboard operation failed: {e}");
                 }
 
                 // Write response and indicate that the process should exit
                 if let Err(e) = Response::new().write(std::io::stdout()) {
-                    eprintln!("Error writing response: {e}");
+                    error!("Error writing response: {e}");
                 }
                 return true;
             }
@@ -41,36 +43,45 @@ pub fn handle_clipboard() -> bool {
 
 /// Copy a Markdown link to the clipboard.
 /// Format: [title](url)
-pub fn copy_markdown_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
-    let markdown = format!("[{}]({})", title.into(), url.into());
-    let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-    ctx.set_contents(markdown.clone()).unwrap();
-    info!("wrote Markdown: {markdown} to the clipboard");
+pub fn copy_markdown_link_to_clipboard(
+    title: impl Into<String>,
+    url: impl Into<String>,
+) -> Result<()> {
+    let title = title.into();
+    let url = url.into();
+    let markdown = format!("[{title}]({url})");
+
+    let mut ctx = Clipboard::new()
+        .map_err(|e| Error::Config(format!("Failed to initialize clipboard: {e}")))?;
+    ctx.set_text(&markdown)
+        .map_err(|e| Error::Config(format!("Failed to set clipboard text: {e}")))?;
+
+    info!("Wrote Markdown link to clipboard: {markdown}");
+    Ok(())
 }
 
 /// Copy a rich text link to the clipboard.
 /// Format: <a href="url">title</a>
-pub fn copy_rich_text_link_to_clipboard(title: impl Into<String>, url: impl Into<String>) {
-    let html = format!("<a href=\"{}\">{}</a>", url.into(), title.into());
+pub fn copy_rich_text_link_to_clipboard(
+    title: impl Into<String>,
+    url: impl Into<String>,
+) -> Result<()> {
+    let title = title.into();
+    let url = url.into();
 
-    let apple_script = format!(
-        "set the clipboard to {{text:\" \", «class HTML»:«data HTML{}»}}",
-        encode(html.as_bytes()),
-    );
+    // Create HTML and plain text versions
+    let html = format!("<a href=\"{url}\">{title}</a>");
+    let plain_text = format!("{title} ({url})");
 
-    // Prepare and execute the osascript command
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(&apple_script)
-        .output()
-        .expect("Failed to execute command");
+    let mut ctx = Clipboard::new()
+        .map_err(|e| Error::Config(format!("Failed to initialize clipboard: {e}")))?;
+    ctx.set_html(&html, Some(&plain_text))
+        .map_err(|e| Error::Config(format!("Failed to set clipboard HTML: {e}")))?;
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        panic!("osascript command failed: {stderr}");
-    }
-
-    info!("wrote HTML to the clipboard as rich text: {html}");
+    info!("Wrote HTML link to clipboard with fallback text");
+    debug!("HTML: {html}");
+    debug!("Plain text: {plain_text}");
+    Ok(())
 }
 
 #[cfg(test)]
@@ -101,10 +112,11 @@ mod tests {
                 ("URL", Some("https://example.com")),
             ],
             || {
-                // We can't fully test the clipboard operation in an automated test,
-                // but we can verify that the function returns the expected result
                 let result = handle_clipboard();
-                assert!(result);
+                assert!(
+                    result,
+                    "handle_clipboard should return true for markdown command"
+                );
             },
         );
     }
@@ -119,10 +131,11 @@ mod tests {
                 ("URL", Some("https://example.com")),
             ],
             || {
-                // We can't fully test the clipboard operation in an automated test,
-                // but we can verify that the function returns the expected result
                 let result = handle_clipboard();
-                assert!(result);
+                assert!(
+                    result,
+                    "handle_clipboard should return true for richtext command"
+                );
             },
         );
     }
@@ -138,7 +151,10 @@ mod tests {
             ],
             || {
                 let result = handle_clipboard();
-                assert!(!result);
+                assert!(
+                    !result,
+                    "handle_clipboard should return false when title is missing"
+                );
             },
         );
 
@@ -150,7 +166,10 @@ mod tests {
             ],
             || {
                 let result = handle_clipboard();
-                assert!(!result);
+                assert!(
+                    !result,
+                    "handle_clipboard should return false when URL is missing"
+                );
             },
         );
     }
@@ -160,14 +179,55 @@ mod tests {
         initialize();
         with_vars(
             [
-                ("ALFRUSCO_COMMAND", Some("unknown")),
+                ("ALFRUSCO_COMMAND", Some("unsupported")),
                 ("TITLE", Some("Test Title")),
                 ("URL", Some("https://example.com")),
             ],
             || {
                 let result = handle_clipboard();
-                assert!(!result);
+                assert!(
+                    !result,
+                    "handle_clipboard should return false for unknown commands"
+                );
             },
+        );
+    }
+
+    #[test]
+    fn test_markdown_link_formatting() {
+        initialize();
+
+        // Test basic formatting
+        let result = copy_markdown_link_to_clipboard("Test", "https://example.com");
+        assert!(result.is_ok(), "Basic markdown link should succeed");
+
+        // Test with special characters
+        let result = copy_markdown_link_to_clipboard(
+            "Title [with] brackets",
+            "https://example.com/path?q=test&p=1",
+        );
+        assert!(
+            result.is_ok(),
+            "Markdown link with special characters should succeed"
+        );
+    }
+
+    #[test]
+    fn test_rich_text_link_formatting() {
+        initialize();
+
+        // Test basic formatting
+        let result = copy_rich_text_link_to_clipboard("Test", "https://example.com");
+        assert!(result.is_ok(), "Basic rich text link should succeed");
+
+        // Test with special characters that need HTML escaping
+        let result = copy_rich_text_link_to_clipboard(
+            "Title with \"quotes\" & ampersands",
+            "https://example.com/path?q=test&p=1",
+        );
+        assert!(
+            result.is_ok(),
+            "Rich text link with special characters should succeed"
         );
     }
 }

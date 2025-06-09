@@ -1,6 +1,6 @@
 [package]
 name = "alfrusco"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "Utilities for building Alfred workflows with Rust."
 license = "MIT"
@@ -9,7 +9,7 @@ license = "MIT"
 async-trait = "0"
 chrono = "0"
 clap = { version = "4.5", features = ["derive", "env"] }
-clipboard = "0"
+arboard = "3"
 env_logger = "0.11"
 fern = { version = "0.7", features = ["colored"] }
 fuzzy-matcher = "0"

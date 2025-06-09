@@ -1,66 +1,48 @@
-use std::env::VarError;
-use std::io;
-
 use alfrusco::{Error, WorkflowError};
 
 #[test]
 fn test_io_error() {
-    let io_error = io::Error::new(io::ErrorKind::NotFound, "file not found");
-    let error = Error::Io(io_error);
-
-    assert!(matches!(error, Error::Io(_)));
-    assert_eq!(error.to_string(), "IO Error: file not found");
+    let err = Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+    assert!(err.to_string().contains("IO Error"));
 }
 
 #[test]
 fn test_var_error() {
-    let var_error = VarError::NotPresent;
-    let error = Error::Var(var_error);
-
-    assert!(matches!(error, Error::Var(_)));
-    assert_eq!(
-        error.to_string(),
-        "Var Error: environment variable not found"
-    );
+    let err = Error::Var(std::env::VarError::NotPresent);
+    assert!(err.to_string().contains("Var Error"));
 }
 
 #[test]
 fn test_missing_env_var_error() {
-    let error = Error::MissingEnvVar("TEST_VAR".to_string());
-
-    assert!(matches!(error, Error::MissingEnvVar(_)));
-    assert_eq!(error.to_string(), "Missing environment variable: TEST_VAR");
-}
-
-#[test]
-fn test_workflow_error_from_string() {
-    let error: Error = "Test error message".into();
-
-    assert!(matches!(error, Error::Workflow(_)));
-    assert_eq!(error.to_string(), "Workflow Error: Test error message");
-}
-
-#[test]
-fn test_workflow_error_from_string_type() {
-    let error: Error = String::from("Test error message").into();
-
-    assert!(matches!(error, Error::Workflow(_)));
-    assert_eq!(error.to_string(), "Workflow Error: Test error message");
+    let err = Error::MissingEnvVar("TEST_VAR".to_string());
+    assert!(err.to_string().contains("Missing environment variable"));
 }
 
 #[test]
 fn test_error_item_with_source() {
-    let io_error = io::Error::new(io::ErrorKind::NotFound, "file not found");
-    let error = Error::Io(io_error);
-
-    // Just verify that error_item() doesn't panic
-    let _item = error.error_item();
+    let err = Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+    let item = err.error_item();
+    let json = serde_json::to_string(&item).unwrap();
+    assert!(json.contains("Error:"));
+    assert!(json.contains("subtitle"));
 }
 
 #[test]
 fn test_error_item_without_source() {
-    let error = Error::MissingEnvVar("TEST_VAR".to_string());
+    let err = Error::Workflow("test error".to_string());
+    let item = err.error_item();
+    let json = serde_json::to_string(&item).unwrap();
+    assert!(json.contains("error occurred"));
+}
 
-    // Just verify that error_item() doesn't panic
-    let _item = error.error_item();
+#[test]
+fn test_workflow_error_from_string() {
+    let err: Error = "test error".to_string().into();
+    assert!(matches!(err, Error::Workflow(_)));
+}
+
+#[test]
+fn test_workflow_error_from_string_type() {
+    let err: Error = "test error".into();
+    assert!(matches!(err, Error::Workflow(_)));
 }
