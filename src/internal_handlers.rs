@@ -147,22 +147,10 @@ fn open_log_file() -> bool {
 /// Open a path using the system's default application
 /// This is a simplified version that doesn't need extensive testing
 fn open_path(path: &str) -> bool {
-    // On macOS, use the 'open' command
-    #[cfg(target_os = "macos")]
-    {
-        use std::process::Command;
-        match Command::new("open").arg(path).output() {
-            Ok(output) => output.status.success(),
-            Err(_) => false,
-        }
-    }
-
-    // On other platforms, you could add similar logic
-    #[cfg(not(target_os = "macos"))]
-    {
-        // For now, just return false on non-macOS platforms
-        // You could implement this for Linux (xdg-open) and Windows (start) if needed
-        false
+    use std::process::Command;
+    match Command::new("open").arg(path).output() {
+        Ok(output) => output.status.success(),
+        Err(_) => false,
     }
 }
 
