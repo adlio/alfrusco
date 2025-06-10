@@ -26,10 +26,8 @@ fn test_copy_markdown_link_to_clipboard() {
         }
         Err(e) => {
             // In headless/CI environments, clipboard operations may fail
-            println!(
-                "Clipboard operation failed (expected in headless environment): {e}"
-            );
-            assert!(matches!(e, Error::Config(_)));
+            println!("Clipboard operation failed (expected in headless environment): {e}");
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 
@@ -40,10 +38,8 @@ fn test_copy_markdown_link_to_clipboard() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            println!(
-                "Clipboard operation failed (expected in headless environment): {e}"
-            );
-            assert!(matches!(e, Error::Config(_)));
+            println!("Clipboard operation failed (expected in headless environment): {e}");
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 
@@ -54,10 +50,8 @@ fn test_copy_markdown_link_to_clipboard() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            println!(
-                "Clipboard operation failed (expected in headless environment): {e}"
-            );
-            assert!(matches!(e, Error::Config(_)));
+            println!("Clipboard operation failed (expected in headless environment): {e}");
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 }
@@ -72,10 +66,8 @@ fn test_copy_rich_text_link_to_clipboard() {
             // Success case - clipboard operation worked
         }
         Err(e) => {
-            println!(
-                "Clipboard operation failed (expected in headless environment): {e}"
-            );
-            assert!(matches!(e, Error::Config(_)));
+            println!("Clipboard operation failed (expected in headless environment): {e}");
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 
@@ -86,10 +78,8 @@ fn test_copy_rich_text_link_to_clipboard() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            println!(
-                "Clipboard operation failed (expected in headless environment): {e}"
-            );
-            assert!(matches!(e, Error::Config(_)));
+            println!("Clipboard operation failed (expected in headless environment): {e}");
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 }
@@ -254,7 +244,7 @@ fn test_unicode_and_special_characters() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            assert!(matches!(e, Error::Config(_)));
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 
@@ -262,7 +252,7 @@ fn test_unicode_and_special_characters() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            assert!(matches!(e, Error::Config(_)));
+            assert!(matches!(e, Error::Clipboard(_)));
         }
     }
 
@@ -279,7 +269,7 @@ fn test_unicode_and_special_characters() {
         match result {
             Ok(_) => {}
             Err(e) => {
-                assert!(matches!(e, Error::Config(_)));
+                assert!(matches!(e, Error::Clipboard(_)));
             }
         }
     }
@@ -293,7 +283,7 @@ fn test_error_integration() {
     match result {
         Ok(_) => {}
         Err(e) => {
-            assert!(matches!(e, Error::Config(_)));
+            assert!(matches!(e, Error::Clipboard(_)));
             assert!(
                 e.to_string().contains("Failed to"),
                 "Error should contain descriptive message"

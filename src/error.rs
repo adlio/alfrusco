@@ -30,6 +30,9 @@ pub enum Error {
     #[error("Configuration Error: {0}")]
     Config(String),
 
+    #[error("Clipboard Error: {0}")]
+    Clipboard(String),
+
     #[error("Logging Error: {0}")]
     Logging(String),
 
