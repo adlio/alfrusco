@@ -1,10 +1,14 @@
-all: lint coverage
+all: lint build coverage
 
 test: check-nextest
-	cargo nextest run --all-targets --all-features --examples
+	# Clipboard tests prohibit parallel test execution because the clipboard is
+	# a shared resource (--test-threads 1 prevents flakiness for those tests)
+	cargo nextest run --all-targets --all-features --examples --test-threads 1
 
 test-without-nextest:
-	cargo test --all-targets --all-features --examples
+	# Clipboard tests prohibit parallel test execution because the clipboard is
+	# a shared resource (--test-threads 1 prevents flakiness for those tests)
+	cargo test --all-targets --all-features --examples -- --test-threads 1
 
 workflow: release
 	cargo build --all-targets --release && \
@@ -24,13 +28,19 @@ clean:
 	cargo llvm-cov clean
 
 coverage: check-llvm-cov
-	cargo llvm-cov --all-features --examples --tests --show-missing-lines
+	# Clipboard tests prohibit parallel test execution because the clipboard is
+	# a shared resource (--test-threads 1 prevents flakiness for those tests)
+	cargo llvm-cov --all-features --examples --tests --show-missing-lines -- --test-threads 1
 
 coverage-html: check-llvm-cov
-	cargo llvm-cov --all-features --examples --tests --html --open
+	# Clipboard tests prohibit parallel test execution because the clipboard is
+	# a shared resource (--test-threads 1 prevents flakiness for those tests)
+	cargo llvm-cov --all-features --examples --tests --html --open -- --test-threads 1
 
 coverage-ci: check-llvm-cov
-	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info
+	# Clipboard tests prohibit parallel test execution because the clipboard is
+	# a shared resource (--test-threads 1 prevents flakiness for those tests)
+	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info -- --test-threads 1
 
 lint: fmt clippy
 
@@ -51,4 +61,5 @@ check-llvm-cov:
 
 check-nextest:
 	@command -v cargo-nextest >/dev/null 2>&1 || { echo "cargo-nextest is not installed. Install it with: cargo install cargo-nextest"; exit 1; }
+
 .PHONY: all test test-without-nextest test-serial test-flaky test-stress clean coverage coverage-html coverage-ci check-llvm-cov check-nextest release fmt fmt-check clippy clippy-fix lint
