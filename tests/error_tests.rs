@@ -2,7 +2,7 @@ use alfrusco::{Error, WorkflowError};
 
 #[test]
 fn test_io_error() {
-    let err = Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+    let err = Error::Io(std::io::Error::other("test error"));
     assert!(err.to_string().contains("IO Error"));
 }
 
@@ -20,7 +20,7 @@ fn test_missing_env_var_error() {
 
 #[test]
 fn test_error_item_with_source() {
-    let err = Error::Io(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+    let err = Error::Io(std::io::Error::other("test error"));
     let item = err.error_item();
     let json = serde_json::to_string(&item).unwrap();
     assert!(json.contains("Error:"));

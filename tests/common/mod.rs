@@ -44,7 +44,7 @@ pub fn create_job_id(name: &str) -> String {
     let mut hasher = DefaultHasher::new();
     name.hash(&mut hasher);
     let hash = hasher.finish();
-    format!("{:x}", hash)
+    format!("{hash:x}")
 }
 
 /// Helper to wait for background job completion with timeout
