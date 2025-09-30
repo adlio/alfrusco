@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.1] - 2025-09-30
+
+### Added
+- `.var()` method support for URLItem - allows setting custom workflow variables on URL items
+
 ## [0.2.0] - 2025-09-30
 
 ### Added
