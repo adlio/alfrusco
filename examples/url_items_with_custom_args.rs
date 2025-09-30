@@ -14,7 +14,7 @@ impl Runnable for URLItemsWithCustomArgsWorkflow {
     type Error = alfrusco::Error;
     
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
-        wf.response.skip_knowledge(true);
+        wf.skip_knowledge(true);
         
         // Regular URLItem - arg defaults to URL
         let regular_url_item = URLItem::new("Rust Documentation", "https://doc.rust-lang.org/");

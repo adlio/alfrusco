@@ -19,7 +19,7 @@ pub fn main() {
 impl alfrusco::Runnable for SleepCommand {
     type Error = alfrusco::Error;
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
-        wf.response.skip_knowledge(true);
+        wf.skip_knowledge(true);
         wf.response.rerun(Duration::from_millis(500));
 
         let mut cmd = Command::new("/bin/sleep");
@@ -29,8 +29,7 @@ impl alfrusco::Runnable for SleepCommand {
 
         wf.run_in_background("sleep", Duration::from_secs(self.duration_in_seconds), cmd);
 
-        wf.response
-            .append_items(vec![URLItem::new("Google", "https://www.google.com").into()]);
+        wf.append_items(vec![URLItem::new("Google", "https://www.google.com").into()]);
         Ok(())
     }
 }

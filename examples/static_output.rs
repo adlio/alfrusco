@@ -13,8 +13,8 @@ pub fn main() {
 impl alfrusco::Runnable for StaticOutputWorkflow {
     type Error = alfrusco::Error;
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
-        wf.response.skip_knowledge(true);
-        wf.response.append_items(vec![
+        wf.skip_knowledge(true);
+        wf.append_items(vec![
             Item::new("First Option").subtitle("First Subtitle"),
             Item::new("Option 2").subtitle("Second Subtitle"),
             Item::new("Three").subtitle("3"),

@@ -8,18 +8,18 @@ A powerful, ergonomic Rust library for building [Alfred](https://www.alfredapp.c
 handles the complexity of Alfred's JSON protocol, provides rich item building capabilities, and includes advanced
 features like background jobs, clipboard operations, and comprehensive logging.
 
-## ✨ Features
+## Features
 
-- **🚀 Simple & Ergonomic API** - Intuitive builder patterns for creating Alfred items
-- **⚡ Async Support** - Full async/await support for modern Rust applications
-- **🔄 Background Jobs** - Run long-running tasks without blocking Alfred's UI
-- **📋 Clipboard Integration** - Built-in support for rich text and Markdown clipboard operations
-- **🎯 Smart Filtering** - Automatic fuzzy search and sorting of results
-- **📁 Workflow Management** - Easy access to workflow directories and configuration
-- **🪵 Comprehensive Logging** - Structured logging with file and console output
-- **🔗 URL Items** - Specialized support for URL-based workflow items
-- **⚙️ Environment Handling** - Robust configuration management for Alfred environments
-- **🧪 Testing Support** - Built-in testing utilities and mocking capabilities
+- **Simple & Ergonomic API** - Intuitive builder patterns for creating Alfred items
+- **Async Support** - Full async/await support for modern Rust applications
+- **Background Jobs** - Run long-running tasks without blocking Alfred's UI
+- **Clipboard Integration** - Built-in support for rich text and Markdown clipboard operations
+- **Smart Filtering** - Automatic fuzzy search and sorting of results
+- **Workflow Management** - Easy access to workflow directories and configuration
+- **Comprehensive Logging** - Structured logging with file and console output
+- **URL Items** - Specialized support for URL-based workflow items
+- **Environment Handling** - Robust configuration management for Alfred environments
+- **Testing Support** - Built-in testing utilities and mocking capabilities
 
 ## 📦 Installation
 
@@ -366,7 +366,7 @@ impl Runnable for MyWorkflow {
         workflow.response.rerun(Duration::from_secs(30));
 
         // Skip Alfred's knowledge base integration
-        workflow.response.skip_knowledge(true);
+        workflow.skip_knowledge(true);
 
         workflow.append_item(Item::new("Cached result"));
         Ok(())
