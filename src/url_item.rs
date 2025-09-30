@@ -13,6 +13,7 @@ pub struct URLItem {
     icon: Option<Icon>,
     display_title: Option<String>,
     copy_text: Option<String>,
+    arg: Option<String>,
 }
 
 impl URLItem {
@@ -64,6 +65,11 @@ impl URLItem {
         self.copy_text = Some(copy_text.into());
         self
     }
+
+    pub fn arg(mut self, arg: impl Into<String>) -> Self {
+        self.arg = Some(arg.into());
+        self
+    }
 }
 
 impl From<URLItem> for Item {
@@ -91,10 +97,12 @@ impl From<URLItem> for Item {
             .var("TITLE", &title)
             .var("URL", &url);
 
+        let arg_value = url_item.arg.as_ref().unwrap_or(&url_item.url);
+        
         let mut item = Item::new(display_title)
             .subtitle(&url_item.url)
             .uid(&url_item.url)
-            .arg(&url_item.url)
+            .arg(arg_value)
             .copy_text(&url_item.url)
             .valid(true)
             .modifier(cmd_mod)
@@ -283,6 +291,32 @@ mod tests {
         assert_ne!(
             item.subtitle,
             Some("https://www.rust-lang.org/".to_string())
+        );
+    }
+
+    #[test]
+    fn test_custom_arg() {
+        let item: Item = URLItem::new("Search Results", "https://example.com/search")
+            .arg("workflow:search:advanced")
+            .into();
+        
+        assert_eq!(item.title, "Search Results");
+        assert_eq!(
+            item.arg,
+            Some(Arg::One("workflow:search:advanced".to_string()))
+        );
+        // URL should still be preserved in subtitle and copy text
+        assert_eq!(item.subtitle, Some("https://example.com/search".to_string()));
+    }
+
+    #[test]
+    fn test_default_arg_behavior() {
+        let item: Item = URLItem::new("Example", "https://example.com").into();
+        
+        // Without custom arg, should use URL as arg
+        assert_eq!(
+            item.arg,
+            Some(Arg::One("https://example.com".to_string()))
         );
     }
 }
