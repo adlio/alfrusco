@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Icon, Item, Key, Modifier};
 
 #[non_exhaustive]
-#[derive(Debug, Default, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct URLItem {
     title: String,
     subtitle: Option<String>,
@@ -14,6 +14,7 @@ pub struct URLItem {
     display_title: Option<String>,
     copy_text: Option<String>,
     arg: Option<String>,
+    variables: std::collections::HashMap<String, String>,
 }
 
 impl URLItem {
@@ -68,6 +69,11 @@ impl URLItem {
 
     pub fn arg(mut self, arg: impl Into<String>) -> Self {
         self.arg = Some(arg.into());
+        self
+    }
+
+    pub fn var(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.variables.insert(key.into(), value.into());
         self
     }
 }
@@ -162,6 +168,11 @@ impl From<URLItem> for Item {
 
         if let Some(copy_text) = copy_text {
             item = item.copy_text(copy_text);
+        }
+
+        // Add custom variables
+        for (key, value) in url_item.variables {
+            item = item.var(key, value);
         }
 
         item
@@ -318,5 +329,34 @@ mod tests {
             item.arg,
             Some(Arg::One("https://example.com".to_string()))
         );
+    }
+
+    #[test]
+    fn test_var_support() {
+        let item: Item = URLItem::new("Test Item", "https://example.com")
+            .var("CUSTOM_VAR", "custom_value")
+            .var("ANOTHER_VAR", "another_value")
+            .into();
+        
+        assert_eq!(item.title, "Test Item");
+        assert_eq!(item.variables.get("CUSTOM_VAR"), Some(&"custom_value".to_string()));
+        assert_eq!(item.variables.get("ANOTHER_VAR"), Some(&"another_value".to_string()));
+    }
+
+    #[test]
+    fn test_var_chaining() {
+        let url_item = URLItem::new("Chained", "https://example.com")
+            .subtitle("Test subtitle")
+            .var("VAR1", "value1")
+            .arg("custom_arg")
+            .var("VAR2", "value2");
+        
+        let item: Item = url_item.into();
+        
+        assert_eq!(item.title, "Chained");
+        assert_eq!(item.subtitle, Some("Test subtitle".to_string()));
+        assert_eq!(item.arg, Some(Arg::One("custom_arg".to_string())));
+        assert_eq!(item.variables.get("VAR1"), Some(&"value1".to_string()));
+        assert_eq!(item.variables.get("VAR2"), Some(&"value2".to_string()));
     }
 }
