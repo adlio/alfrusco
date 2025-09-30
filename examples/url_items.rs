@@ -16,7 +16,7 @@ impl alfrusco::Runnable for URLItemsWorkflow {
     type Error = alfrusco::Error;
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         wf.skip_knowledge(true);
-        wf.response.cache(Duration::from_secs(60), true);
+        wf.cache(Duration::from_secs(60), true);
         wf.append_items(vec![
             URLItem::new("DuckDuckGo", "https://www.duckduckgo.com").into(),
             URLItem::new("Google", "https://www.google.com").into(),

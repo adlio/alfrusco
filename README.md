@@ -360,10 +360,10 @@ impl Runnable for MyWorkflow {
 
     fn run(self, workflow: &mut Workflow) -> Result<(), Self::Error> {
         // Cache results for 5 minutes, allow loose reload
-        workflow.response.cache(Duration::from_secs(300), true);
+        workflow.cache(Duration::from_secs(300), true);
 
         // Automatically rerun every 30 seconds
-        workflow.response.rerun(Duration::from_secs(30));
+        workflow.rerun(Duration::from_secs(30));
 
         // Skip Alfred's knowledge base integration
         workflow.skip_knowledge(true);

@@ -20,7 +20,7 @@ impl alfrusco::Runnable for SleepCommand {
     type Error = alfrusco::Error;
     fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
         wf.skip_knowledge(true);
-        wf.response.rerun(Duration::from_millis(500));
+        wf.rerun(Duration::from_millis(500));
 
         let mut cmd = Command::new("/bin/sleep");
         cmd.stdout(std::process::Stdio::piped());

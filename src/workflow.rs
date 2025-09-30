@@ -67,6 +67,14 @@ impl Workflow {
         self.response.skip_knowledge(skip);
     }
 
+    pub fn cache(&mut self, duration: std::time::Duration, loose_reload: bool) {
+        self.response.cache(duration, loose_reload);
+    }
+
+    pub fn rerun(&mut self, interval: std::time::Duration) {
+        self.response.rerun(interval);
+    }
+
     pub fn data_dir(&self) -> PathBuf {
         self.config.workflow_data.clone()
     }
@@ -307,5 +315,31 @@ mod tests {
         // Verify the directories were created
         assert!(provider.0.join("workflow_data").exists());
         assert!(provider.0.join("workflow_cache").exists());
+    }
+
+    #[test]
+    fn test_cache_method() {
+        let (mut workflow, _dir) = test_workflow();
+        
+        workflow.cache(std::time::Duration::from_secs(300), true);
+        
+        // Test by serializing and checking the output contains cache settings
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        workflow.response.write(&mut buffer).unwrap();
+        let output = String::from_utf8(buffer.into_inner()).unwrap();
+        assert!(output.contains("\"cache\":{\"seconds\":300,\"loosereload\":true}"));
+    }
+
+    #[test]
+    fn test_rerun_method() {
+        let (mut workflow, _dir) = test_workflow();
+        
+        workflow.rerun(std::time::Duration::from_secs(30));
+        
+        // Test by serializing and checking the output contains rerun setting
+        let mut buffer = std::io::Cursor::new(Vec::new());
+        workflow.response.write(&mut buffer).unwrap();
+        let output = String::from_utf8(buffer.into_inner()).unwrap();
+        assert!(output.contains("\"rerun\":30"));
     }
 }
