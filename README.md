@@ -27,7 +27,7 @@ Add alfrusco to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-alfrusco = "0.1"
+alfrusco = "0.2"
 
 # For async workflows
 tokio = { version = "1", features = ["full"] }
@@ -210,7 +210,8 @@ impl Runnable for MyWorkflow {
 
 ### Background Jobs
 
-Run long-running tasks without blocking Alfred's UI with enhanced status tracking and automatic retry logic:
+Run long-running tasks without blocking Alfred's UI. This example fetches GitHub release data in the background and
+caches it to disk, showing cached results immediately while refreshing stale data:
 
 ```rust
 use std::process::Command;
@@ -220,10 +221,15 @@ impl Runnable for MyWorkflow {
     type Error = alfrusco::Error;
 
     fn run(self, workflow: &mut Workflow) -> Result<(), Self::Error> {
-        // Set up a command to run in the background
-        let mut cmd = Command::new("curl");
-        cmd.arg("-s")
-            .arg("https://api.github.com/repos/rust-lang/rust/releases/latest");
+        let cache_file = workflow.cache_dir().join("releases.json");
+
+        // Set up a command to fetch data and save to cache
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c")
+            .arg(format!(
+                "curl -s https://api.github.com/repos/rust-lang/rust/releases/latest > {}",
+                cache_file.display()
+            ));
 
         // Run the command in the background, refresh every 30 seconds
         workflow.run_in_background(
@@ -232,12 +238,23 @@ impl Runnable for MyWorkflow {
             cmd
         );
 
-        // Show immediate results while background job runs
-        workflow.append_item(
-            Item::new("Fetching latest Rust release...")
-                .subtitle("Background job in progress")
-                .valid(false)
-        );
+        // Check if we have cached data to display
+        if cache_file.exists() {
+            if let Ok(data) = std::fs::read_to_string(&cache_file) {
+                if let Ok(release) = serde_json::from_str::<serde_json::Value>(&data) {
+                    if let Some(tag) = release["tag_name"].as_str() {
+                        workflow.append_item(
+                            Item::new(format!("Latest Rust: {}", tag))
+                                .subtitle("Click to view release notes")
+                                .arg(release["html_url"].as_str().unwrap_or(""))
+                                .valid(true)
+                        );
+                    }
+                }
+            }
+        }
+
+        // run_in_background automatically shows a status item when the job is stale
 
         Ok(())
     }
@@ -246,15 +263,17 @@ impl Runnable for MyWorkflow {
 
 **Enhanced Background Job Features:**
 
-- **Smart Status Tracking**: Jobs show detailed status messages like "Last succeeded 2 minutes ago (14:32:15), running for 3s" or "Last failed 5 minutes ago (14:29:42), running for 1s"
+- **Smart Status Tracking**: Jobs show detailed status messages like "Last succeeded 2 minutes ago (14:32:15), running
+  for 3s" or "Last failed 5 minutes ago (14:29:42), running for 1s"
 - **Automatic Retry Logic**: Failed jobs are automatically retried even if they ran recently, ensuring eventual success
 - **Context-Aware Icons**: Visual indicators show job status at a glance:
-  - ✅ Success jobs show completion icon
-  - ❌ Failed jobs show error icon  
-  - 🔄 Retry attempts show sync icon
-  - 🕐 First-time runs show clock icon
+    - ✅ Success jobs show completion icon
+    - ❌ Failed jobs show error icon
+    - 🔄 Retry attempts show sync icon
+    - 🕐 First-time runs show clock icon
 - **Secure Shell Escaping**: Arguments with spaces and special characters are properly escaped for security
-- **Robust Last-Run Tracking**: All job executions are tracked regardless of success/failure for accurate status reporting
+- **Robust Last-Run Tracking**: All job executions are tracked regardless of success/failure for accurate status
+  reporting
 
 **Background Job Status Messages:**
 
@@ -266,11 +285,11 @@ Last succeeded 2 minutes ago (14:32:15), running for 3s
 ```
 
 This gives users clear visibility into:
+
 - When the job last ran successfully or failed
 - The exact time of the last execution
 - How long the current execution has been running
 - Visual context through appropriate icons
-```
 
 ### URL Items with Rich Clipboard Support
 
@@ -280,11 +299,11 @@ Create URL items with automatic clipboard integration:
 use alfrusco::URLItem;
 
 let url_item = URLItem::new("Rust Documentation", "https://doc.rust-lang.org/")
-.subtitle("The Rust Programming Language Documentation")
-.short_title("Rust Docs")  // Used in Cmd+Shift modifier
-.long_title("The Rust Programming Language Official Documentation")  // Used in Cmd+Ctrl modifier
-.icon_for_filetype("public.html")
-.copy_text("doc.rust-lang.org");
+    .subtitle("The Rust Programming Language Documentation")
+    .short_title("Rust Docs")  // Used in Cmd+Shift modifier
+    .long_title("The Rust Programming Language Official Documentation")  // Used in Cmd+Ctrl modifier
+    .icon_for_filetype("public.html")
+    .copy_text("doc.rust-lang.org");
 
 // Convert to regular Item (happens automatically when added to workflow)
 let item: Item = url_item.into();
@@ -297,7 +316,9 @@ URL items automatically include modifiers for copying links:
 - **⌘⇧ (Cmd+Shift)**: Copy as Markdown with short title
 - **⌥⇧ (Alt+Shift)**: Copy as rich text with short title
 - **⌘⌃ (Cmd+Ctrl)**: Copy as Markdown with long title
-- **⌥⌃ (Alt+Ctrl)**: Copy as rich text with long title### Smart Filtering and Sorting
+- **⌥⌃ (Alt+Ctrl)**: Copy as rich text with long title
+
+### Smart Filtering and Sorting
 
 Enable automatic fuzzy search and sorting of results:
 
@@ -425,7 +446,7 @@ mod tests {
 Alfrusco maintains a comprehensive test suite with **112 tests** across organized test files:
 
 - **`background_job_integration_tests.rs`** - Complete background job lifecycle testing (6 tests)
-- **`clipboard_tests.rs`** - Clipboard functionality testing (4 tests)  
+- **`clipboard_tests.rs`** - Clipboard functionality testing (4 tests)
 - **`config_tests.rs`** - Configuration and environment testing (8 tests)
 - **`error_injection_tests.rs`** - Error handling and edge cases (2 tests)
 - **`error_tests.rs`** - Error type behavior (7 tests)
@@ -435,7 +456,10 @@ Alfrusco maintains a comprehensive test suite with **112 tests** across organize
 
 ### Shared Test Utilities
 
-The `tests/common/mod.rs` module provides reusable testing utilities that eliminate code duplication and ensure consistent test setup across the entire test suite. This includes helper functions for creating test workflows, managing temporary directories, and common test operations.
+The `tests/common/mod.rs` module provides reusable testing utilities that eliminate code duplication and ensure
+consistent test setup across the entire test suite. This includes helper functions for creating test workflows, managing
+temporary directories, and common test operations.
+
 ```
 
 ## 📚 Examples
@@ -466,6 +490,7 @@ The `examples/` directory contains complete, runnable examples. Since these exam
 ```
 
 **Option 2: Using Make targets**
+
 ```bash
 # List all available examples
 make examples-help
@@ -477,6 +502,7 @@ make example-url_items
 ```
 
 **Option 3: Manual environment setup**
+
 ```bash
 # Set required Alfred environment variables
 export alfred_workflow_bundleid="com.example.test"
