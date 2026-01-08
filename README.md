@@ -2,6 +2,8 @@
 
 [![Crates.io](https://img.shields.io/crates/v/alfrusco.svg)](https://crates.io/crates/alfrusco)
 [![Documentation](https://docs.rs/alfrusco/badge.svg)](https://docs.rs/alfrusco)
+[![CI](https://github.com/adlio/alfrusco/actions/workflows/ci.yml/badge.svg)](https://github.com/adlio/alfrusco/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/adlio/alfrusco/graph/badge.svg)](https://codecov.io/gh/adlio/alfrusco)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A powerful, ergonomic Rust library for building [Alfred](https://www.alfredapp.com/) workflows with ease. Alfrusco
