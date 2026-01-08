@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - 2026-01-08
+
+### Added
+- Boost feature for controlling item ranking in filtered results
+- `Item::boost(value)` method to adjust fuzzy match scores
+- Boost constants for common priority levels:
+  - `BOOST_SLIGHT` (25) - Subtle preference
+  - `BOOST_LOW` (50) - Minor preference
+  - `BOOST_MODERATE` (75) - Noticeable preference
+  - `BOOST_HIGH` (100) - Strong preference
+  - `BOOST_HIGHER` (150) - Very strong preference
+  - `BOOST_HIGHEST` (200) - Effectively guarantees top ranking
+
 ## [0.2.1] - 2025-09-30
 
 ### Added
