@@ -53,6 +53,63 @@ pub fn wait_for_job_completion(max_wait_ms: u64) {
     std::thread::sleep(std::time::Duration::from_millis(max_wait_ms));
 }
 
+/// Helper to wait for a job to complete with a specific status.
+/// This waits for:
+/// 1. The status file to contain the expected value
+/// 2. The last_run file to be modified after we started waiting (indicating script fully completed)
+#[allow(dead_code)]
+pub fn wait_for_job_status(
+    status_file: &Path,
+    expected_status: &str,
+    timeout_ms: u64,
+) -> Result<(), String> {
+    use std::time::SystemTime;
+
+    let start_time = SystemTime::now();
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_millis(timeout_ms);
+    let job_dir = status_file.parent().unwrap();
+    let last_run_file = job_dir.join("job.last_run");
+
+    loop {
+        // Check all conditions for job completion:
+        // 1. Status file has expected value
+        // 2. last_run file was modified after we started waiting (script completed)
+        let status_ok = status_file.exists()
+            && std::fs::read_to_string(status_file)
+                .map(|s| s.trim() == expected_status)
+                .unwrap_or(false);
+
+        let last_run_recent = last_run_file.exists()
+            && std::fs::metadata(&last_run_file)
+                .and_then(|m| m.modified())
+                .map(|mtime| mtime >= start_time)
+                .unwrap_or(false);
+
+        if status_ok && last_run_recent {
+            // Give a tiny bit more time for the bash process to fully exit
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            return Ok(());
+        }
+
+        if start.elapsed() > timeout {
+            let actual_status = if status_file.exists() {
+                std::fs::read_to_string(status_file).unwrap_or_else(|_| "<unreadable>".to_string())
+            } else {
+                "<file not found>".to_string()
+            };
+            return Err(format!(
+                "Timeout waiting for job completion. Status: '{}' (expected '{}'), last_run recent: {}",
+                actual_status.trim(),
+                expected_status,
+                last_run_recent
+            ));
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 /// Helper to find a job directory in the jobs folder
 #[allow(dead_code)]
 pub fn find_job_directory(jobs_dir: &Path) -> Option<std::path::PathBuf> {

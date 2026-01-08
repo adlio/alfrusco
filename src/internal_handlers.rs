@@ -145,7 +145,7 @@ fn open_log_file() -> bool {
 }
 
 /// Open a path using the system's default application
-/// This is a simplified version that doesn't need extensive testing
+#[cfg(not(test))]
 fn open_path(path: &str) -> bool {
     use std::process::Command;
     match Command::new("open").arg(path).output() {
@@ -155,14 +155,60 @@ fn open_path(path: &str) -> bool {
 }
 
 #[cfg(test)]
+fn open_path(path: &str) -> bool {
+    tests::mock_open_path(path)
+}
+
+#[cfg(test)]
 mod tests {
-    use std::fs;
+    use std::cell::RefCell;
 
     use temp_env::with_vars;
     use tempfile;
 
     use super::*;
     use crate::config::{self, ConfigProvider};
+
+    // ============================================================================
+    // Mock infrastructure for open_path
+    // ============================================================================
+
+    thread_local! {
+        static MOCK_OPEN_PATH: RefCell<MockOpenPath> = RefCell::new(MockOpenPath::default());
+    }
+
+    #[derive(Default)]
+    struct MockOpenPath {
+        calls: Vec<String>,
+        return_value: bool,
+    }
+
+    /// Called by the test version of open_path
+    pub fn mock_open_path(path: &str) -> bool {
+        MOCK_OPEN_PATH.with(|mock| {
+            let mut mock = mock.borrow_mut();
+            mock.calls.push(path.to_string());
+            mock.return_value
+        })
+    }
+
+    /// Set up the mock to return a specific value and clear previous calls
+    fn setup_mock_open(return_value: bool) {
+        MOCK_OPEN_PATH.with(|mock| {
+            let mut mock = mock.borrow_mut();
+            mock.calls.clear();
+            mock.return_value = return_value;
+        });
+    }
+
+    /// Get the paths that were passed to open_path
+    fn get_mock_open_calls() -> Vec<String> {
+        MOCK_OPEN_PATH.with(|mock| mock.borrow().calls.clone())
+    }
+
+    // ============================================================================
+    // Test helpers
+    // ============================================================================
 
     fn test_workflow() -> Workflow {
         let dir = tempfile::tempdir().unwrap();
@@ -206,24 +252,17 @@ mod tests {
 
     #[test]
     fn test_handle_workflow_dir_open_returns_true_path() {
-        // Test the code path where handle_workflow_dir_open returns true
-        // This happens when execute_workflow_command returns Some(true)
-        // Which happens when open_directory_from_env or open_log_file return true
+        // Test the code path where execute_workflow_command returns Some(true)
+        // which happens when open_directory_from_env succeeds
+        setup_mock_open(true);
 
-        // The challenge is that handle_workflow_dir_open depends on extract_query_from_args()
-        // which uses std::env::args(). We can't control this in tests.
-        // However, we can test execute_workflow_command directly, which is what we do above.
-
-        // This test verifies the logic even though we can't easily trigger it via handle()
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
-
-        with_vars([("alfred_workflow_cache", Some(temp_path))], || {
+        with_vars([("alfred_workflow_cache", Some("/cache/path"))], || {
             let mut workflow = test_workflow();
-            // Directly test that OpenCache command returns Some(bool)
             let result = execute_workflow_command(WorkflowCommand::OpenCache, &mut workflow);
-            // This covers the execute_workflow_command logic
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls, vec!["/cache/path"]);
         });
     }
 
@@ -405,40 +444,43 @@ mod tests {
 
     #[test]
     fn test_execute_workflow_command_open_cache() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_cache", Some(temp_path))], || {
+        with_vars([("alfred_workflow_cache", Some("/cache/dir"))], || {
             let mut workflow = test_workflow();
             let result = execute_workflow_command(WorkflowCommand::OpenCache, &mut workflow);
-            // Result will be Some(bool) where bool depends on whether 'open' command succeeds
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls, vec!["/cache/dir"]);
         });
     }
 
     #[test]
     fn test_execute_workflow_command_open_data() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_data", Some(temp_path))], || {
+        with_vars([("alfred_workflow_data", Some("/data/dir"))], || {
             let mut workflow = test_workflow();
             let result = execute_workflow_command(WorkflowCommand::OpenData, &mut workflow);
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls, vec!["/data/dir"]);
         });
     }
 
     #[test]
     fn test_execute_workflow_command_open_log() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let log_path = temp_dir.path().join("workflow.log");
-        fs::write(&log_path, "test log").unwrap();
-        let log_path_str = log_path.to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_log", Some(log_path_str))], || {
+        with_vars([("alfred_workflow_log", Some("/log/file.log"))], || {
             let mut workflow = test_workflow();
             let result = execute_workflow_command(WorkflowCommand::OpenLog, &mut workflow);
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls, vec!["/log/file.log"]);
         });
     }
 
@@ -493,39 +535,41 @@ mod tests {
 
     #[test]
     fn test_open_directory_from_env_var_exists() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("test_env_var", Some(temp_path))], || {
+        with_vars([("test_env_var", Some("/some/path"))], || {
             let result = open_directory_from_env("test_env_var");
-            // Result depends on whether 'open' command succeeds
-            // On macOS it should work, on Linux it might fail, so we just check it returns a bool
-            let _ = result;
+            assert!(result);
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0], "/some/path");
         });
     }
 
     #[test]
     fn test_open_directory_from_env_var_missing() {
+        setup_mock_open(true);
+
         with_vars([("test_env_var", None::<&str>)], || {
             let result = open_directory_from_env("test_env_var");
             assert!(!result, "Should return false when env var is missing");
+
+            // open_path should not have been called
+            let calls = get_mock_open_calls();
+            assert!(calls.is_empty());
         });
     }
 
     #[test]
-    fn test_open_directory_from_env_invalid_path() {
-        // Test with a path that doesn't exist
-        with_vars(
-            [(
-                "test_env_var",
-                Some("/nonexistent/path/that/does/not/exist"),
-            )],
-            || {
-                let result = open_directory_from_env("test_env_var");
-                // The 'open' command might fail or succeed depending on the system
-                let _ = result;
-            },
-        );
+    fn test_open_directory_from_env_returns_open_result() {
+        // Test that the function returns whatever open_path returns
+        setup_mock_open(false);
+
+        with_vars([("test_env_var", Some("/some/path"))], || {
+            let result = open_directory_from_env("test_env_var");
+            assert!(!result, "Should return false when open_path returns false");
+        });
     }
 
     // ============================================================================
@@ -534,48 +578,48 @@ mod tests {
 
     #[test]
     fn test_open_log_file_with_alfred_workflow_log() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let log_path = temp_dir.path().join("workflow.log");
-        fs::write(&log_path, "test log").unwrap();
-        let log_path_str = log_path.to_str().unwrap();
+        setup_mock_open(true);
 
         with_vars(
             [
-                ("alfred_workflow_log", Some(log_path_str)),
+                ("alfred_workflow_log", Some("/path/to/workflow.log")),
                 ("alfred_workflow_cache", None::<&str>),
             ],
             || {
                 let result = open_log_file();
-                // Should use alfred_workflow_log and attempt to open it
-                let _ = result;
+                assert!(result);
+
+                let calls = get_mock_open_calls();
+                assert_eq!(calls.len(), 1);
+                assert_eq!(calls[0], "/path/to/workflow.log");
             },
         );
     }
 
     #[test]
     fn test_open_log_file_fallback_to_cache_dir() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
-
-        // Create the workflow.log file in the cache directory
-        let log_path = temp_dir.path().join("workflow.log");
-        fs::write(&log_path, "test log").unwrap();
+        setup_mock_open(true);
 
         with_vars(
             [
                 ("alfred_workflow_log", None::<&str>),
-                ("alfred_workflow_cache", Some(temp_path)),
+                ("alfred_workflow_cache", Some("/cache/dir")),
             ],
             || {
                 let result = open_log_file();
-                // Should fall back to cache directory + /workflow.log
-                let _ = result;
+                assert!(result);
+
+                let calls = get_mock_open_calls();
+                assert_eq!(calls.len(), 1);
+                assert_eq!(calls[0], "/cache/dir/workflow.log");
             },
         );
     }
 
     #[test]
     fn test_open_log_file_no_env_vars() {
+        setup_mock_open(true);
+
         with_vars(
             [
                 ("alfred_workflow_log", None::<&str>),
@@ -584,83 +628,77 @@ mod tests {
             || {
                 let result = open_log_file();
                 assert!(!result, "Should return false when no env vars are set");
+
+                // open_path should not have been called
+                let calls = get_mock_open_calls();
+                assert!(calls.is_empty());
             },
         );
     }
 
     #[test]
-    fn test_open_log_file_both_env_vars_set() {
+    fn test_open_log_file_prefers_workflow_log_over_cache() {
         // When both are set, alfred_workflow_log should take precedence
-        let temp_dir = tempfile::tempdir().unwrap();
-        let log_path = temp_dir.path().join("specific.log");
-        fs::write(&log_path, "specific log").unwrap();
-        let log_path_str = log_path.to_str().unwrap();
-
-        let cache_dir = tempfile::tempdir().unwrap();
-        let cache_path = cache_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
         with_vars(
             [
-                ("alfred_workflow_log", Some(log_path_str)),
-                ("alfred_workflow_cache", Some(cache_path)),
+                ("alfred_workflow_log", Some("/specific/log/path.log")),
+                ("alfred_workflow_cache", Some("/cache/dir")),
             ],
             || {
                 let result = open_log_file();
-                // Should use alfred_workflow_log (takes precedence)
-                let _ = result;
+                assert!(result);
+
+                let calls = get_mock_open_calls();
+                assert_eq!(calls.len(), 1);
+                // Should use alfred_workflow_log, not cache dir
+                assert_eq!(calls[0], "/specific/log/path.log");
             },
         );
     }
 
     // ============================================================================
-    // open_path() tests
+    // open_path() tests (via mock)
     // ============================================================================
 
     #[test]
-    fn test_open_path_success() {
-        // Create a temporary file that exists
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_file = temp_dir.path().join("test.txt");
-        fs::write(&temp_file, "test").unwrap();
+    fn test_open_path_returns_true_on_success() {
+        setup_mock_open(true);
 
-        let result = open_path(temp_file.to_str().unwrap());
-        // On macOS, 'open' should succeed. On Linux/CI, it might fail
-        // We just verify it returns a bool without panicking
-        let _ = result;
+        let result = open_path("/some/path/to/file.txt");
+        assert!(result);
+
+        let calls = get_mock_open_calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "/some/path/to/file.txt");
     }
 
     #[test]
-    fn test_open_path_nonexistent() {
-        let result = open_path("/nonexistent/path/that/does/not/exist/file.txt");
-        // The 'open' command behavior varies by system
-        // We just verify it returns a bool without panicking
-        let _ = result;
+    fn test_open_path_returns_false_on_failure() {
+        setup_mock_open(false);
+
+        let result = open_path("/some/path");
+        assert!(!result);
+
+        let calls = get_mock_open_calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "/some/path");
     }
 
     #[test]
-    fn test_open_path_directory() {
-        // Test opening a directory
-        let temp_dir = tempfile::tempdir().unwrap();
-        let result = open_path(temp_dir.path().to_str().unwrap());
-        let _ = result;
-    }
+    fn test_open_path_records_all_calls() {
+        setup_mock_open(true);
 
-    #[test]
-    fn test_open_path_with_various_paths() {
-        // Test various path scenarios to maximize coverage
-        let test_cases = vec![
-            "/tmp",              // System directory
-            "/nonexistent/path", // Nonexistent path
-            "",                  // Empty path
-            "/dev/null",         // Special file
-        ];
+        open_path("/path/one");
+        open_path("/path/two");
+        open_path("/path/three");
 
-        for path in test_cases {
-            let result = open_path(path);
-            // Just verify it returns a bool without panicking
-            // The result depends on the system, but we're testing the code paths
-            let _ = result;
-        }
+        let calls = get_mock_open_calls();
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0], "/path/one");
+        assert_eq!(calls[1], "/path/two");
+        assert_eq!(calls[2], "/path/three");
     }
 
     // ============================================================================
@@ -684,53 +722,58 @@ mod tests {
 
     #[test]
     fn test_workflow_command_integration_open_cache() {
-        // Test the full flow: query -> parse -> execute for opening cache
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_cache", Some(temp_path))], || {
+        with_vars([("alfred_workflow_cache", Some("/cache/path"))], || {
             let mut workflow = test_workflow();
             let query = "workflow:cache";
             let command = parse_workflow_command(query);
             let result = execute_workflow_command(command, &mut workflow);
 
-            assert!(result.is_some());
-            // No items should be added for open commands
+            assert_eq!(result, Some(true));
             assert_eq!(workflow.response.items.len(), 0);
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0], "/cache/path");
         });
     }
 
     #[test]
     fn test_workflow_command_integration_open_data() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let temp_path = temp_dir.path().to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_data", Some(temp_path))], || {
+        with_vars([("alfred_workflow_data", Some("/data/path"))], || {
             let mut workflow = test_workflow();
             let query = "workflow:data";
             let command = parse_workflow_command(query);
             let result = execute_workflow_command(command, &mut workflow);
 
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
             assert_eq!(workflow.response.items.len(), 0);
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0], "/data/path");
         });
     }
 
     #[test]
     fn test_workflow_command_integration_open_log() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let log_path = temp_dir.path().join("workflow.log");
-        fs::write(&log_path, "test log").unwrap();
-        let log_path_str = log_path.to_str().unwrap();
+        setup_mock_open(true);
 
-        with_vars([("alfred_workflow_log", Some(log_path_str))], || {
+        with_vars([("alfred_workflow_log", Some("/log/workflow.log"))], || {
             let mut workflow = test_workflow();
             let query = "workflow:openlog";
             let command = parse_workflow_command(query);
             let result = execute_workflow_command(command, &mut workflow);
 
-            assert!(result.is_some());
+            assert_eq!(result, Some(true));
             assert_eq!(workflow.response.items.len(), 0);
+
+            let calls = get_mock_open_calls();
+            assert_eq!(calls.len(), 1);
+            assert_eq!(calls[0], "/log/workflow.log");
         });
     }
 }

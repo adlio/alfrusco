@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use common::{
     create_job_id, create_test_workflow_with_temp, find_job_directory, wait_for_job_completion,
+    wait_for_job_status,
 };
 
 #[test]
@@ -136,21 +137,28 @@ fn test_background_job_failure_status() {
 fn test_failed_jobs_are_retried() {
     let (mut workflow, temp_dir) = create_test_workflow_with_temp();
     let temp_path = temp_dir.path();
+    let jobs_dir = temp_path.join("jobs");
+    let job_id = create_job_id("retry_test_job");
+    let job_dir = jobs_dir.join(&job_id);
+    let status_file = job_dir.join("job.status");
 
     // Step 1: Run a job that will fail
     let cmd = Command::new("false");
     workflow.run_in_background("retry_test_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(1000);
+    // Wait for the job to actually complete with "failed" status
+    wait_for_job_status(&status_file, "failed", 5000)
+        .expect("First job should complete with 'failed' status");
 
     // Step 2: Run the same job again - it should be re-run because it failed
     let cmd2 = Command::new("false");
     workflow.run_in_background("retry_test_job", Duration::from_secs(0), cmd2);
 
-    wait_for_job_completion(1000);
+    // Wait for the second job to complete
+    wait_for_job_status(&status_file, "failed", 5000)
+        .expect("Second job should complete with 'failed' status");
 
-    // Verify the job directory exists and has the expected files
-    let jobs_dir = temp_path.join("jobs");
+    // Verify the job directory exists
     let job_dir = find_job_directory(&jobs_dir).expect("Should have found a job directory");
 
     // Verify that the last_run file exists (jobs should be tracked even when they fail)
@@ -161,11 +169,8 @@ fn test_failed_jobs_are_retried() {
     );
 
     // Verify status file shows "failed"
-    let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(status.trim(), "failed");
-    }
+    let status = fs::read_to_string(&status_file).unwrap();
+    assert_eq!(status.trim(), "failed");
 }
 
 #[test]

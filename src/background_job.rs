@@ -260,13 +260,12 @@ impl<'a> BackgroundJob<'a> {
         }
         let cmd_string = cmd_parts.join(" ");
 
-        // Create a bash command that:
+        // Create a bash script that:
         // 1. Executes the target command with output redirection
         // 2. Checks the exit code and writes status
         // 3. Always updates the last_run file (regardless of success/failure)
-        // 4. Runs completely detached
         let bash_command = format!(
-            r#"({} > "{}" 2>&1; if [ $? -eq 0 ]; then echo "success" > "{}"; else echo "failed" > "{}"; fi; touch "{}") &"#,
+            r#"{} > "{}" 2>&1; if [ $? -eq 0 ]; then echo "success" > "{}"; else echo "failed" > "{}"; fi; touch "{}""#,
             cmd_string,
             self.job_dir().join("job.logs").display(),
             self.job_dir().join("job.status").display(),
@@ -274,7 +273,9 @@ impl<'a> BackgroundJob<'a> {
             self.job_dir().join("job.last_run").display()
         );
 
-        // Spawn the bash command with inherited environment
+        // Spawn the bash process directly. Rust's spawn() creates a child process
+        // that continues running independently. We use Stdio::null() to detach
+        // stdin/stdout/stderr so the child doesn't hold any handles to our process.
         let mut cmd = Command::new("/bin/bash");
         cmd.arg("-c");
         cmd.arg(&bash_command);
@@ -283,7 +284,9 @@ impl<'a> BackgroundJob<'a> {
         // This is crucial for commands that depend on Alfred's environment
         cmd.envs(std::env::vars());
 
-        // Detach completely - no stdout/stderr capture needed
+        // Detach all stdio - this ensures the child process doesn't hold any
+        // handles that could cause issues when the parent exits
+        cmd.stdin(std::process::Stdio::null());
         cmd.stdout(std::process::Stdio::null());
         cmd.stderr(std::process::Stdio::null());
 

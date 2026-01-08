@@ -81,8 +81,10 @@ coverage-html: ensure-tools ## Generate HTML coverage report and open
 	cargo llvm-cov --all-features --examples --tests --html --open -- --test-threads 1
 
 coverage-ci: ensure-tools ## Generate LCOV coverage for CI
+	@# Clean to avoid stale artifacts causing incorrect coverage
+	cargo llvm-cov clean --workspace
 	@# Clipboard tests require --test-threads 1 (shared resource)
-	cargo llvm-cov --all-features --examples --lcov --output-path lcov.info -- --test-threads 1
+	cargo llvm-cov --all-features --examples --tests --lcov --output-path lcov.info -- --test-threads 1
 
 all: ensure-tools fmt lint build test ## Format, lint, build, and test
 
