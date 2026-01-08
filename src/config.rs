@@ -26,7 +26,7 @@ const VAR_DEBUG: &str = "alfred_debug";
 /// In a real-world scenario, these values are read from environment variables.
 /// The from_env() constructor is the primary way to create a WorkflowConfig.
 ///
-/// See https://www.alfredapp.com/help/workflows/script-environment-variables/
+/// See <https://www.alfredapp.com/help/workflows/script-environment-variables/>
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct WorkflowConfig {
     pub workflow_bundleid: String,

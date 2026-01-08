@@ -1,5 +1,0 @@
-[toolchain]
-# We are using the nightly channel for tools in order
-# to use the group_imports = "StdExternalCrate" to
-# automatically keep imports sorted cleanly.
-channel = "nightly"

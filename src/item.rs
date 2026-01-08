@@ -9,7 +9,7 @@ pub use crate::{Arg, Icon, Modifier, Text};
 /// The fields here are designed around the Script Filter JSON format defined
 /// on the Alfred website:
 ///
-/// (https://www.alfredapp.com/help/workflows/inputs/script-filter/json/).
+/// (<https://www.alfredapp.com/help/workflows/inputs/script-filter/json/>).
 ///
 /// Fields here include all current features, but the struct is marked
 /// non-exhaustive to allow for future expansion of the Alfred JSON format.

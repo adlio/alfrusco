@@ -44,7 +44,7 @@ pub fn handle_clipboard() -> bool {
 }
 
 /// Format a Markdown link.
-/// Format: [title](url)
+/// Format: `[title](url)`
 pub fn format_markdown_link(title: impl Into<String>, url: impl Into<String>) -> String {
     let title = title.into();
     let url = url.into();
@@ -60,7 +60,7 @@ pub fn format_html_link(title: impl Into<String>, url: impl Into<String>) -> Str
 }
 
 /// Copy a Markdown link to the clipboard.
-/// Format: [title](url)
+/// Format: `[title](url)`
 pub fn copy_markdown_link_to_clipboard(
     title: impl Into<String>,
     url: impl Into<String>,

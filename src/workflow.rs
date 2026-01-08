@@ -97,13 +97,15 @@ impl Workflow {
 /// - The configuration cannot be loaded
 /// - The workflow cannot be created
 pub fn setup_workflow(provider: &dyn ConfigProvider) -> Workflow {
-    let config = provider.config();
-    if config.is_err() {
-        eprintln!("Error loading config: {}", config.unwrap_err());
-        std::process::exit(1);
-    }
+    let config = match provider.config() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Error loading config: {e}");
+            std::process::exit(1);
+        }
+    };
 
-    let mut workflow = match Workflow::new(config.unwrap()) {
+    let mut workflow = match Workflow::new(config) {
         Ok(workflow) => workflow,
         Err(e) => {
             eprintln!("Error creating workflow: {e}");
@@ -320,9 +322,9 @@ mod tests {
     #[test]
     fn test_cache_method() {
         let (mut workflow, _dir) = test_workflow();
-        
+
         workflow.cache(std::time::Duration::from_secs(300), true);
-        
+
         // Test by serializing and checking the output contains cache settings
         let mut buffer = std::io::Cursor::new(Vec::new());
         workflow.response.write(&mut buffer).unwrap();
@@ -333,9 +335,9 @@ mod tests {
     #[test]
     fn test_rerun_method() {
         let (mut workflow, _dir) = test_workflow();
-        
+
         workflow.rerun(std::time::Duration::from_secs(30));
-        
+
         // Test by serializing and checking the output contains rerun setting
         let mut buffer = std::io::Cursor::new(Vec::new());
         workflow.response.write(&mut buffer).unwrap();

@@ -6,26 +6,59 @@ description = "Utilities for building Alfred workflows with Rust."
 license = "MIT"
 
 [dependencies]
-async-trait = "0"
-chrono = "0"
+async-trait = "0.1"
+chrono = "0.4"
 clap = { version = "4.5", features = ["derive", "env"] }
 arboard = "3"
 env_logger = "0.11"
 fern = { version = "0.7", features = ["colored"] }
-fuzzy-matcher = "0"
-hex = "0"
+fuzzy-matcher = "0.3"
+hex = "0.4"
 humantime = "2"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sysinfo = "0"
+sysinfo = "0.33"
 thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 
 [dev-dependencies]
 # Clap is used in examples/
 clap = { version = "4", features = ["derive", "env"] }
-reqwest = { version = "0", features = ["json"] }
-temp-env = "0"
+reqwest = { version = "0.12", features = ["json"] }
+temp-env = "0.3"
 tempfile = "3"
 tokio = { version = "1", features = ["full", "test-util"] }
+cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
+
+[lints.rust]
+unsafe_code = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+# Common pedantic exceptions
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+doc_markdown = "allow"
+needless_pass_by_value = "allow"
+semicolon_if_nothing_returned = "allow"
+single_match_else = "allow"
+unused_self = "allow"
+match_single_binding = "allow"
+unnecessary_wraps = "allow"
+redundant_closure_for_method_calls = "allow"
+ref_option = "allow"
+cast_precision_loss = "allow"
+wildcard_imports = "allow"
+ignored_unit_patterns = "allow"
+enum_glob_use = "allow"
+needless_raw_string_hashes = "allow"
+if_not_else = "allow"
+unnested_or_patterns = "allow"
+similar_names = "allow"
+items_after_statements = "allow"
+match_same_arms = "allow"

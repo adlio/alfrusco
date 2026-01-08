@@ -38,7 +38,7 @@ impl std::fmt::Display for Key {
 /// of Keys (such as `cmd+shift`).
 ///
 /// See more on the spec on the Alfred site:
-/// https://www.alfredapp.com/help/workflows/inputs/script-filter/json/
+/// <https://www.alfredapp.com/help/workflows/inputs/script-filter/json/>
 ///
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Modifier {

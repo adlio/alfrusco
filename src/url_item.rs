@@ -104,7 +104,7 @@ impl From<URLItem> for Item {
             .var("URL", &url);
 
         let arg_value = url_item.arg.as_ref().unwrap_or(&url_item.url);
-        
+
         let mut item = Item::new(display_title)
             .subtitle(&url_item.url)
             .uid(&url_item.url)
@@ -310,25 +310,25 @@ mod tests {
         let item: Item = URLItem::new("Search Results", "https://example.com/search")
             .arg("workflow:search:advanced")
             .into();
-        
+
         assert_eq!(item.title, "Search Results");
         assert_eq!(
             item.arg,
             Some(Arg::One("workflow:search:advanced".to_string()))
         );
         // URL should still be preserved in subtitle and copy text
-        assert_eq!(item.subtitle, Some("https://example.com/search".to_string()));
+        assert_eq!(
+            item.subtitle,
+            Some("https://example.com/search".to_string())
+        );
     }
 
     #[test]
     fn test_default_arg_behavior() {
         let item: Item = URLItem::new("Example", "https://example.com").into();
-        
+
         // Without custom arg, should use URL as arg
-        assert_eq!(
-            item.arg,
-            Some(Arg::One("https://example.com".to_string()))
-        );
+        assert_eq!(item.arg, Some(Arg::One("https://example.com".to_string())));
     }
 
     #[test]
@@ -337,10 +337,16 @@ mod tests {
             .var("CUSTOM_VAR", "custom_value")
             .var("ANOTHER_VAR", "another_value")
             .into();
-        
+
         assert_eq!(item.title, "Test Item");
-        assert_eq!(item.variables.get("CUSTOM_VAR"), Some(&"custom_value".to_string()));
-        assert_eq!(item.variables.get("ANOTHER_VAR"), Some(&"another_value".to_string()));
+        assert_eq!(
+            item.variables.get("CUSTOM_VAR"),
+            Some(&"custom_value".to_string())
+        );
+        assert_eq!(
+            item.variables.get("ANOTHER_VAR"),
+            Some(&"another_value".to_string())
+        );
     }
 
     #[test]
@@ -350,9 +356,9 @@ mod tests {
             .var("VAR1", "value1")
             .arg("custom_arg")
             .var("VAR2", "value2");
-        
+
         let item: Item = url_item.into();
-        
+
         assert_eq!(item.title, "Chained");
         assert_eq!(item.subtitle, Some("Test subtitle".to_string()));
         assert_eq!(item.arg, Some(Arg::One("custom_arg".to_string())));
