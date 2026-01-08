@@ -137,4 +137,61 @@ mod tests {
         assert!(result.iter().any(|item| item.title == "Configuration"));
         assert!(result.iter().any(|item| item.title == "Profile"));
     }
+
+    #[test]
+    fn test_filter_with_sticky_items() {
+        let mut sticky_item = Item::new("Important").subtitle("Always shown");
+        sticky_item.sticky = true;
+
+        let items = vec![
+            sticky_item,
+            Item::new("Apple").subtitle("Fruit"),
+            Item::new("Banana").subtitle("Fruit"),
+        ];
+
+        // Sticky items should appear first regardless of query
+        let result = filter_and_sort_items(items, "fruit".to_string());
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].title, "Important"); // Sticky item first
+        assert!(result[1..].iter().any(|item| item.title == "Apple"));
+        assert!(result[1..].iter().any(|item| item.title == "Banana"));
+    }
+
+    #[test]
+    fn test_filter_without_sticky_items() {
+        // This test specifically covers the else branch at line 59
+        let items = vec![
+            Item::new("Dog").subtitle("Pet"),
+            Item::new("Cat").subtitle("Pet"),
+            Item::new("Bird").subtitle("Pet"),
+        ];
+
+        // No sticky items - should return filtered results directly
+        let result = filter_and_sort_items(items, "pet".to_string());
+        assert_eq!(result.len(), 3);
+        // All items should be in results, no sticky items to prepend
+        assert!(result.iter().any(|item| item.title == "Dog"));
+        assert!(result.iter().any(|item| item.title == "Cat"));
+        assert!(result.iter().any(|item| item.title == "Bird"));
+    }
+
+    #[test]
+    fn test_filter_empty_items() {
+        let items: Vec<Item> = vec![];
+        let result = filter_and_sort_items(items, "query".to_string());
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_filter_empty_query() {
+        let items = vec![
+            Item::new("Apple").subtitle("Fruit"),
+            Item::new("Banana").subtitle("Fruit"),
+        ];
+
+        // Empty query should still work through fuzzy matcher
+        let result = filter_and_sort_items(items, String::new());
+        // Empty string matches everything in fuzzy matching
+        assert_eq!(result.len(), 2);
+    }
 }

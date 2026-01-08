@@ -500,3 +500,77 @@ impl<'a> BackgroundJob<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shell_escape_empty_string() {
+        assert_eq!(shell_escape(""), "''");
+    }
+
+    #[test]
+    fn test_shell_escape_simple_alphanumeric() {
+        assert_eq!(shell_escape("simple"), "simple");
+        assert_eq!(shell_escape("test123"), "test123");
+        assert_eq!(shell_escape("CamelCase"), "CamelCase");
+    }
+
+    #[test]
+    fn test_shell_escape_with_safe_chars() {
+        assert_eq!(shell_escape("with-dash"), "with-dash");
+        assert_eq!(shell_escape("with_underscore"), "with_underscore");
+        assert_eq!(shell_escape("file.txt"), "file.txt");
+        assert_eq!(shell_escape("/path/to/file"), "/path/to/file");
+        assert_eq!(shell_escape("mixed-file_name.txt"), "mixed-file_name.txt");
+    }
+
+    #[test]
+    fn test_shell_escape_with_spaces() {
+        assert_eq!(shell_escape("with spaces"), "'with spaces'");
+        assert_eq!(shell_escape("hello world"), "'hello world'");
+    }
+
+    #[test]
+    fn test_shell_escape_with_special_chars() {
+        assert_eq!(shell_escape("special!char"), "'special!char'");
+        assert_eq!(shell_escape("has$dollar"), "'has$dollar'");
+        assert_eq!(shell_escape("back`tick"), "'back`tick'");
+    }
+
+    #[test]
+    fn test_shell_escape_with_single_quotes() {
+        assert_eq!(shell_escape("it's"), "'it'\"'\"'s'");
+        assert_eq!(shell_escape("quote'here"), "'quote'\"'\"'here'");
+    }
+
+    #[test]
+    fn test_create_job_id_deterministic() {
+        let id1 = create_job_id("test_job");
+        let id2 = create_job_id("test_job");
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_create_job_id_different_names() {
+        let id1 = create_job_id("job_a");
+        let id2 = create_job_id("job_b");
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn test_create_job_id_is_hex() {
+        let id = create_job_id("test_job");
+        assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_job_execution_status_equality() {
+        assert_eq!(JobExecutionStatus::Success, JobExecutionStatus::Success);
+        assert_eq!(JobExecutionStatus::Failed, JobExecutionStatus::Failed);
+        assert_eq!(JobExecutionStatus::Running, JobExecutionStatus::Running);
+        assert_eq!(JobExecutionStatus::Unknown, JobExecutionStatus::Unknown);
+        assert_ne!(JobExecutionStatus::Success, JobExecutionStatus::Failed);
+    }
+}

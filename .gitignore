@@ -15,6 +15,16 @@ Cargo.lock
 
 tarpaulin-report.html
 
-.idea/aws.xml
+# IDE
+.idea/
+.vscode/
+
+# AI Agent config
+.claude/settings.local.json
+
+# Coverage artifacts
+*.profraw
+*.profdata
+lcov.info
 
 spec.md
