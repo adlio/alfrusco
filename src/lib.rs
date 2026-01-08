@@ -22,7 +22,9 @@ pub use arg::Arg;
 pub use error::{Error, Result, WorkflowError};
 pub use icon::*;
 pub use internal_handlers::handle;
-pub use item::Item;
+pub use item::{
+    Item, BOOST_HIGH, BOOST_HIGHER, BOOST_HIGHEST, BOOST_LOW, BOOST_MODERATE, BOOST_SLIGHT,
+};
 pub use logging::init_logging;
 pub use modifiers::{Key, Modifier};
 pub use response::Response;

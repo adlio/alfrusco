@@ -23,15 +23,16 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
 
     let matcher = SkimMatcherV2::default();
 
-    // Filter and score regular items
+    // Filter and score regular items, adding boost to the score
     let mut filtered_items: Vec<(Item, i64)> = regular_items
         .into_iter()
         .filter_map(|item| {
             let subtitle = item.subtitle.as_deref().unwrap_or_default();
             let combined = format!("{} : {}", subtitle, item.title);
+            let boost = item.boost;
             matcher
                 .fuzzy_match(&combined, &query)
-                .map(|score| (item, score))
+                .map(|score| (item, score + boost))
         })
         .collect();
 
@@ -193,5 +194,76 @@ mod tests {
         let result = filter_and_sort_items(items, String::new());
         // Empty string matches everything in fuzzy matching
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_boost_affects_sort_order() {
+        // Items with identical content but different boosts
+        let items = vec![
+            Item::new("Apple").subtitle("Fruit").boost(0),
+            Item::new("Apple").subtitle("Fruit").boost(100),
+        ];
+
+        let result = filter_and_sort_items(items, "apple".to_string());
+        assert_eq!(result.len(), 2);
+        // Item with higher boost should be first
+        assert_eq!(result[0].boost, 100);
+        assert_eq!(result[1].boost, 0);
+    }
+
+    #[test]
+    fn test_boost_can_overcome_fuzzy_score() {
+        // "Apple" matches "apple" better than "Pineapple" does
+        // But with enough boost, the worse match can rank higher
+        let items = vec![
+            Item::new("Apple").subtitle("Fruit").boost(0),
+            Item::new("Pineapple").subtitle("Fruit").boost(200),
+        ];
+
+        let result = filter_and_sort_items(items, "apple".to_string());
+        assert_eq!(result.len(), 2);
+        // Despite worse fuzzy match, boosted item should be first
+        assert_eq!(result[0].title, "Pineapple");
+        assert_eq!(result[1].title, "Apple");
+    }
+
+    #[test]
+    fn test_negative_boost_lowers_ranking() {
+        let items = vec![
+            Item::new("Apple").subtitle("Fruit").boost(-100),
+            Item::new("Apple").subtitle("Fruit").boost(0),
+        ];
+
+        let result = filter_and_sort_items(items, "apple".to_string());
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].boost, 0);
+        assert_eq!(result[1].boost, -100);
+    }
+
+    #[test]
+    fn test_boost_does_not_affect_sticky_items() {
+        // Sticky items always appear first, regardless of boost
+        let items = vec![
+            Item::new("Normal").subtitle("Item").boost(1000),
+            Item::new("Sticky").subtitle("Item").sticky(true).boost(0),
+        ];
+
+        let result = filter_and_sort_items(items, "item".to_string());
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].title, "Sticky");
+        assert_eq!(result[1].title, "Normal");
+    }
+
+    #[test]
+    fn test_boost_only_affects_matching_items() {
+        // Boost doesn't make non-matching items appear
+        let items = vec![
+            Item::new("Banana").subtitle("Fruit").boost(1000),
+            Item::new("Apple").subtitle("Fruit").boost(0),
+        ];
+
+        let result = filter_and_sort_items(items, "apple".to_string());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "Apple");
     }
 }

@@ -346,6 +346,37 @@ impl Runnable for SearchWorkflow {
 }
 ```
 
+#### Boosting Item Priority
+
+Use boost to influence ranking when filtering is enabled. Higher boost values rank items higher:
+
+```rust
+use alfrusco::{Item, BOOST_HIGH, BOOST_MODERATE};
+
+// Items with boost will rank higher in filtered results
+workflow.append_items(vec![
+    Item::new("Preferred Result")
+        .subtitle("This ranks higher")
+        .boost(BOOST_HIGH),
+    Item::new("Normal Result")
+        .subtitle("Standard ranking")
+        .boost(0),  // default
+    Item::new("Slightly Preferred")
+        .subtitle("Moderate boost")
+        .boost(BOOST_MODERATE),
+]);
+```
+
+Available boost constants (in ascending order):
+- `BOOST_SLIGHT` (25) - Subtle preference
+- `BOOST_LOW` (50) - Minor preference
+- `BOOST_MODERATE` (75) - Noticeable preference
+- `BOOST_HIGH` (100) - Strong preference
+- `BOOST_HIGHER` (150) - Very strong preference
+- `BOOST_HIGHEST` (200) - Effectively guarantees top ranking
+
+**Note:** Boost only affects non-sticky items. Use `.sticky(true)` for items that should always appear first regardless of the query.
+
 ### Workflow Directories
 
 Access workflow-specific data and cache directories:
@@ -550,6 +581,8 @@ The primary building block for Alfred workflow results.
 - `var(key, value)` - Set workflow variables
 - `autocomplete(text)` - Set tab completion text
 - `modifier(modifier)` - Add keyboard modifier actions
+- `sticky(bool)` - Pin item to top of results (ignores filtering)
+- `boost(value)` - Adjust ranking in filtered results (use `BOOST_*` constants)
 
 #### `URLItem`
 

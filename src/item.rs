@@ -4,6 +4,30 @@ use serde::Serialize;
 
 pub use crate::{Arg, Icon, Modifier, Text};
 
+/// Slight boost to fuzzy match score (+25 points).
+/// Use when you want a subtle preference for an item.
+pub const BOOST_SLIGHT: i64 = 25;
+
+/// Low boost to fuzzy match score (+50 points).
+/// Use for minor preference that can still be overridden by better matches.
+pub const BOOST_LOW: i64 = 50;
+
+/// Moderate boost to fuzzy match score (+75 points).
+/// Use for noticeable preference in search results.
+pub const BOOST_MODERATE: i64 = 75;
+
+/// High boost to fuzzy match score (+100 points).
+/// Use for strong preference, will often rank above similar matches.
+pub const BOOST_HIGH: i64 = 100;
+
+/// Higher boost to fuzzy match score (+150 points).
+/// Use for very strong preference, will rank above most other matches.
+pub const BOOST_HIGHER: i64 = 150;
+
+/// Highest boost to fuzzy match score (+200 points).
+/// Use to effectively guarantee top ranking among non-sticky items.
+pub const BOOST_HIGHEST: i64 = 200;
+
 /// Item represents a single choice in the Alfred selection UI.
 ///
 /// The fields here are designed around the Script Filter JSON format defined
@@ -56,6 +80,11 @@ pub struct Item {
 
     #[serde(skip_serializing)]
     pub(crate) sticky: bool,
+
+    /// Boost value added to the fuzzy match score for sorting.
+    /// Higher values rank the item higher in results.
+    #[serde(skip_serializing)]
+    pub(crate) boost: i64,
 }
 
 impl Item {
@@ -157,9 +186,45 @@ impl Item {
         self
     }
 
+    /// Set a boost value that's added to the fuzzy match score.
+    ///
+    /// Higher values rank this item higher in filtered results. Fuzzy match
+    /// scores typically range from 30-150, so boost values in that range will
+    /// have a meaningful impact on ordering.
+    ///
+    /// Use the provided constants for common boost levels:
+    /// - [`BOOST_SLIGHT`] (25) - Subtle preference
+    /// - [`BOOST_LOW`] (50) - Minor preference
+    /// - [`BOOST_MODERATE`] (75) - Noticeable preference
+    /// - [`BOOST_HIGH`] (100) - Strong preference
+    /// - [`BOOST_HIGHER`] (150) - Very strong preference
+    /// - [`BOOST_HIGHEST`] (200) - Effectively guarantees top ranking
+    ///
+    /// Note: Boost only affects non-sticky items. Sticky items always appear
+    /// first regardless of boost value.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use alfrusco::{Item, BOOST_HIGH};
+    ///
+    /// let item = Item::new("Preferred Result")
+    ///     .subtitle("This will rank higher")
+    ///     .boost(BOOST_HIGH);
+    /// ```
+    pub fn boost(mut self, boost: i64) -> Self {
+        self.boost = boost;
+        self
+    }
+
     #[cfg(test)]
     pub(crate) fn test_helper_get_sticky(&self) -> bool {
         self.sticky
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_helper_get_boost(&self) -> i64 {
+        self.boost
     }
 }
 
@@ -364,5 +429,28 @@ mod tests {
             "title": "Test Item"
         });
         assert_eq!(json, expected);
+    }
+
+    #[test]
+    fn test_boost_builder() {
+        // Default should be 0
+        let item = Item::new("Test Item");
+        assert_eq!(item.test_helper_get_boost(), 0);
+
+        // Test setting boost values
+        let item = Item::new("Test").boost(100);
+        assert_eq!(item.test_helper_get_boost(), 100);
+
+        // Test negative boost
+        let item = Item::new("Test").boost(-50);
+        assert_eq!(item.test_helper_get_boost(), -50);
+    }
+
+    #[test]
+    fn test_boost_not_serialized() {
+        // Boost should not appear in JSON output
+        let item = Item::new("Test Item").boost(100);
+        let json_str = serde_json::to_string(&item).unwrap();
+        assert!(!json_str.contains("boost"));
     }
 }
