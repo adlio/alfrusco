@@ -1,4 +1,5 @@
 use std::env::var;
+use std::process::Command;
 
 use arboard::Clipboard;
 use log::{debug, error, info};
@@ -77,16 +78,34 @@ pub fn copy_markdown_link_to_clipboard(
 
 /// Copy a rich text link to the clipboard.
 /// Format: <a href="url">title</a>
+///
+/// Uses AppleScript to properly set the HTML clipboard type,
+/// which is required for apps like Slack to recognize rich text links.
 pub fn copy_rich_text_link_to_clipboard(
     title: impl Into<String>,
     url: impl Into<String>,
 ) -> Result<()> {
-    let html = format_html_link(title, url);
+    let url = url.into();
+    let html = format_html_link(title, &url);
 
-    let mut ctx = Clipboard::new()
-        .map_err(|e| Error::Clipboard(format!("Failed to initialize clipboard: {e}")))?;
-    ctx.set_html(&html, None)
-        .map_err(|e| Error::Clipboard(format!("Failed to set clipboard HTML: {e}")))?;
+    // Use AppleScript to set HTML clipboard type properly
+    // The «class HTML» type is required for apps like Slack to recognize rich text
+    let apple_script = format!(
+        "set the clipboard to {{text:\"{}\", «class HTML»:«data HTML{}»}}",
+        url,
+        hex::encode(html.as_bytes()),
+    );
+
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(&apple_script)
+        .output()
+        .map_err(|e| Error::Clipboard(format!("Failed to execute osascript: {e}")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(Error::Clipboard(format!("osascript failed: {stderr}")));
+    }
 
     info!("Wrote rich text link to clipboard: {html}");
     Ok(())
