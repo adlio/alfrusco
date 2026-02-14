@@ -114,12 +114,12 @@ impl From<URLItem> for Item {
             .modifier(cmd_mod)
             .modifier(alt_mod);
 
-        if url_item.subtitle.is_some() {
-            item = item.subtitle(url_item.subtitle.unwrap());
+        if let Some(subtitle) = url_item.subtitle {
+            item = item.subtitle(subtitle);
         }
 
-        if url_item.icon.is_some() {
-            item = item.icon(url_item.icon.unwrap());
+        if let Some(icon) = url_item.icon {
+            item = item.icon(icon);
         }
 
         if let Some(short_title) = &short_title {

@@ -4,6 +4,13 @@ version = "0.3.0"
 edition = "2021"
 description = "Utilities for building Alfred workflows with Rust."
 license = "MIT"
+homepage = "https://github.com/adlio/alfrusco"
+repository = "https://github.com/adlio/alfrusco"
+documentation = "https://docs.rs/alfrusco"
+readme = "README.md"
+keywords = ["alfred", "workflow", "macos", "automation"]
+categories = ["os::macos-apis", "gui"]
+exclude = [".cargo-husky/", ".claude/", ".github/", "workflow/", "AGENTS.md"]
 
 [dependencies]
 async-trait = "0.1"

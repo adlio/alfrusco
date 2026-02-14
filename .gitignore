@@ -28,3 +28,6 @@ tarpaulin-report.html
 lcov.info
 
 spec.md
+
+# Mutation testing artifacts
+**/mutants.out*/
