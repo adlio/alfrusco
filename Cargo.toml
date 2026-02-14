@@ -10,7 +10,7 @@ documentation = "https://docs.rs/alfrusco"
 readme = "README.md"
 keywords = ["alfred", "workflow", "macos", "automation"]
 categories = ["os::macos-apis", "gui"]
-exclude = [".cargo-husky/", ".claude/", ".github/", "workflow/", "AGENTS.md"]
+exclude = [".cargo-husky/", ".claude/", ".github/", ".idea/", "workflow/", "AGENTS.md"]
 
 [dependencies]
 async-trait = "0.1"
@@ -34,6 +34,7 @@ tokio = { version = "1", features = ["full"] }
 clap = { version = "4", features = ["derive", "env"] }
 reqwest = { version = "0.12", features = ["json"] }
 temp-env = "0.3"
+wiremock = "0.6"
 tempfile = "3"
 tokio = { version = "1", features = ["full", "test-util"] }
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }

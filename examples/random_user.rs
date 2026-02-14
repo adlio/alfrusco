@@ -7,6 +7,9 @@ struct RandomUserWorkflow {
     pub keyword: Vec<String>,
     #[arg(short, long, env)]
     pub name: Option<String>,
+    /// Override API base URL (for testing)
+    #[arg(long, default_value = "https://randomuser.me")]
+    pub api_url: String,
 }
 
 #[tokio::main]
@@ -29,8 +32,11 @@ impl AsyncRunnable for RandomUserWorkflow {
         let query = self.keyword.join(" ");
         wf.set_filter_keyword(query.clone());
 
-        let url = "https://randomuser.me/api/?inc=gender,name&results=50&seed=alfrusco";
-        let response = reqwest::get(url).await?;
+        let url = format!(
+            "{}/api/?inc=gender,name&results=50&seed=alfrusco",
+            self.api_url
+        );
+        let response = reqwest::get(&url).await?;
         let response: RandomUserResponse = response.json().await?;
         wf.append_items(
             response
@@ -111,12 +117,41 @@ impl std::error::Error for RandomUserError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const MOCK_RESPONSE: &str = r#"{
+        "results": [
+            {"gender": "male", "name": {"title": "Mr", "first": "Fletcher", "last": "Hall"}},
+            {"gender": "female", "name": {"title": "Ms", "first": "Jane", "last": "Doe"}}
+        ],
+        "info": {"seed": "alfrusco", "results": 2, "page": 1, "version": "1.4"}
+    }"#;
+
+    #[test]
+    fn test_random_user_deserialization() {
+        let response: RandomUserResponse = serde_json::from_str(MOCK_RESPONSE).unwrap();
+        assert_eq!(response.results.len(), 2);
+        assert_eq!(response.results[0].name.title, "Mr");
+        assert_eq!(response.results[0].name.first, "Fletcher");
+        assert_eq!(response.results[0].name.last, "Hall");
+    }
 
     #[tokio::test]
     async fn test_random_user_response() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_raw(MOCK_RESPONSE, "application/json"),
+            )
+            .mount(&server)
+            .await;
+
         let command = RandomUserWorkflow {
             keyword: vec![],
             name: None,
+            api_url: server.uri(),
         };
 
         let mut buffer = Vec::new();
@@ -124,5 +159,21 @@ mod tests {
         alfrusco::execute_async(&config::TestingProvider(dir), command, &mut buffer).await;
         let output = String::from_utf8(buffer).unwrap();
         assert!(output.contains("\"title\":\"Mr Fletcher Hall\""));
+        assert!(output.contains("\"title\":\"Ms Jane Doe\""));
+    }
+
+    #[tokio::test]
+    async fn test_random_user_name_override() {
+        let command = RandomUserWorkflow {
+            keyword: vec![],
+            name: Some("Alice".to_string()),
+            api_url: String::new(),
+        };
+
+        let mut buffer = Vec::new();
+        let dir = tempfile::tempdir().unwrap().keep();
+        alfrusco::execute_async(&config::TestingProvider(dir), command, &mut buffer).await;
+        let output = String::from_utf8(buffer).unwrap();
+        assert!(output.contains("NAME DEFINED AS: 'Alice'"));
     }
 }
