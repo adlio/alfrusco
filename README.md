@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/alfrusco/badge.svg)](https://docs.rs/alfrusco)
 [![CI](https://github.com/adlio/alfrusco/actions/workflows/ci.yml/badge.svg)](https://github.com/adlio/alfrusco/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/adlio/alfrusco/graph/badge.svg)](https://codecov.io/gh/adlio/alfrusco)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A Rust library for building [Alfred](https://www.alfredapp.com/) workflows. It handles Alfred's JSON protocol, provides builder patterns for creating items, and includes support for background jobs, clipboard operations, and logging.
 
