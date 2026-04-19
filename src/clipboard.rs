@@ -237,7 +237,9 @@ mod tests {
         assert_eq!(format_html_link("", ""), "<a href=\"\"></a>");
     }
 
-    // Integration tests - these access the actual clipboard
+    // Integration tests - these access the actual clipboard (macOS-only:
+    // arboard needs a display server, and the rich-text path shells out to osascript)
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_markdown_link_formatting() {
         initialize();
@@ -257,6 +259,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_rich_text_link_formatting() {
         initialize();
