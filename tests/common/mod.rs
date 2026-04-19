@@ -76,15 +76,12 @@ pub fn wait_for_job_status(
         // 1. Status file has expected value
         // 2. last_run file was modified after we started waiting (script completed)
         let status_ok = status_file.exists()
-            && std::fs::read_to_string(status_file)
-                .map(|s| s.trim() == expected_status)
-                .unwrap_or(false);
+            && std::fs::read_to_string(status_file).is_ok_and(|s| s.trim() == expected_status);
 
         let last_run_recent = last_run_file.exists()
             && std::fs::metadata(&last_run_file)
                 .and_then(|m| m.modified())
-                .map(|mtime| mtime >= start_time)
-                .unwrap_or(false);
+                .is_ok_and(|mtime| mtime >= start_time);
 
         if status_ok && last_run_recent {
             // Give a tiny bit more time for the bash process to fully exit

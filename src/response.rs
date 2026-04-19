@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn test_cache() -> Result<()> {
         let mut response = Response::default();
-        response.cache(Duration::from_secs(10800), true);
+        response.cache(Duration::from_hours(3), true);
         assert_matches(
             r#"{"cache":{"seconds":10800,"loosereload":true},"items":[]}"#,
             response,
@@ -194,8 +194,8 @@ mod tests {
             (Duration::from_millis(400), "0.4"),
             (Duration::from_millis(432), "0.432"),
             (Duration::from_secs(2), "2"),
-            (Duration::from_secs(60), "60"),
-            (Duration::from_secs(300), "300"),
+            (Duration::from_mins(1), "60"),
+            (Duration::from_mins(5), "300"),
             (Duration::from_millis(2500), "2.5"),
         ];
 
@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn test_cache_settings_serialization() -> Result<()> {
         let cache_settings = CacheSettings {
-            seconds: Some(Duration::from_secs(60)),
+            seconds: Some(Duration::from_mins(1)),
             loose_reload: Some(true),
         };
 
@@ -410,7 +410,7 @@ mod tests {
         response
             .rerun(Duration::from_secs(5))
             .skip_knowledge(true)
-            .cache(Duration::from_secs(60), false);
+            .cache(Duration::from_mins(1), false);
 
         assert_matches(
             r#"{"rerun":5,"cache":{"seconds":60,"loosereload":false},"skipknowledge":true,"items":[{"title":"Test Item"}]}"#,

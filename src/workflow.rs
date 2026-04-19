@@ -323,7 +323,7 @@ mod tests {
     fn test_cache_method() {
         let (mut workflow, _dir) = test_workflow();
 
-        workflow.cache(std::time::Duration::from_secs(300), true);
+        workflow.cache(std::time::Duration::from_mins(5), true);
 
         // Test by serializing and checking the output contains cache settings
         let mut buffer = std::io::Cursor::new(Vec::new());

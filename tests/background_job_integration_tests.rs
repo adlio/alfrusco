@@ -70,7 +70,7 @@ fn test_background_job_fresh_vs_stale() {
     // Run with a long max_age to ensure it's considered fresh
     let mut cmd = Command::new("echo");
     cmd.arg("test");
-    workflow.run_in_background("fresh_job", Duration::from_secs(3600), cmd);
+    workflow.run_in_background("fresh_job", Duration::from_hours(1), cmd);
 
     // Verify that no new PID file was created (job wasn't run)
     let pid_file = job_dir.join("job.pid");

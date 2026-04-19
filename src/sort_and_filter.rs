@@ -42,7 +42,7 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
     );
 
     // Sort by score in descending order
-    filtered_items.sort_unstable_by(|a, b| b.1.cmp(&a.1));
+    filtered_items.sort_unstable_by_key(|item| std::cmp::Reverse(item.1));
 
     // Extract the items from the tuples
     let mut result: Vec<Item> = filtered_items.into_iter().map(|(item, _)| item).collect();
