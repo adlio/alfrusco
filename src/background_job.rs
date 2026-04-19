@@ -479,12 +479,19 @@ impl<'a> BackgroundJob<'a> {
 
         let pid = self.get_pid();
         match pid {
-            Ok(pid) => system.process(sysinfo::Pid::from(pid as usize)).map(|p| {
-                let start_time = UNIX_EPOCH + Duration::from_secs(p.start_time());
-                SystemTime::now()
-                    .duration_since(start_time)
-                    .unwrap_or_default()
-            }),
+            Ok(pid) => system
+                .process(sysinfo::Pid::from(pid as usize))
+                // A zombie (terminated but not yet reaped) is not actually running.
+                // On Linux this matters: our bash child becomes a zombie after it exits
+                // because we never call wait() on it, and we'd otherwise treat the
+                // previous invocation as still in-flight and skip retries.
+                .filter(|p| !matches!(p.status(), sysinfo::ProcessStatus::Zombie))
+                .map(|p| {
+                    let start_time = UNIX_EPOCH + Duration::from_secs(p.start_time());
+                    SystemTime::now()
+                        .duration_since(start_time)
+                        .unwrap_or_default()
+                }),
             Err(_) => None,
         }
     }
