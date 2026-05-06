@@ -34,11 +34,17 @@ library
   exposed-modules:
     Alfrusco
     Alfrusco.Arg
+    Alfrusco.Config
+    Alfrusco.Error
     Alfrusco.Icon
     Alfrusco.Item
     Alfrusco.Modifier
     Alfrusco.Response
+    Alfrusco.Runnable
+    Alfrusco.SortAndFilter
     Alfrusco.Text
+    Alfrusco.URLItem
+    Alfrusco.Workflow
   build-depends:
     , hslogger              >=1.3   && <1.4
     , optparse-applicative  >=0.17  && <0.19

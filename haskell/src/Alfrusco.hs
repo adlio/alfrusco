@@ -8,11 +8,23 @@ module Alfrusco
   , module Alfrusco.Modifier
   , module Alfrusco.Item
   , module Alfrusco.Response
+  , module Alfrusco.Error
+  , module Alfrusco.Config
+  , module Alfrusco.Workflow
+  , module Alfrusco.Runnable
+  , module Alfrusco.SortAndFilter
+  , module Alfrusco.URLItem
   ) where
 
 import Alfrusco.Arg
+import Alfrusco.Config
+import Alfrusco.Error
 import Alfrusco.Icon
 import Alfrusco.Item
 import Alfrusco.Modifier
 import Alfrusco.Response
+import Alfrusco.Runnable
+import Alfrusco.SortAndFilter
 import Alfrusco.Text
+import Alfrusco.URLItem
+import Alfrusco.Workflow
