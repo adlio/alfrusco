@@ -33,7 +33,12 @@ library
   hs-source-dirs: src
   exposed-modules:
     Alfrusco
-    Alfrusco.Types
+    Alfrusco.Arg
+    Alfrusco.Icon
+    Alfrusco.Item
+    Alfrusco.Modifier
+    Alfrusco.Response
+    Alfrusco.Text
   build-depends:
     , hslogger              >=1.3   && <1.4
     , optparse-applicative  >=0.17  && <0.19
