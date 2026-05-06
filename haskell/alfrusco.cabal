@@ -1,0 +1,63 @@
+cabal-version:   2.4
+name:            alfrusco
+version:         0.1.0.0
+synopsis:        A Haskell library for building Alfred workflows
+description:     Alfrusco provides types and utilities for building Alfred workflow
+                 script filters, including JSON output generation, fuzzy matching,
+                 background job management, and clipboard operations.
+license:         MIT
+license-file:    LICENSE
+author:          alfrusco contributors
+maintainer:      alfrusco contributors
+category:        System
+build-type:      Simple
+
+common common-deps
+  default-language: GHC2021
+  ghc-options:      -Wall
+  build-depends:
+    , base                  >=4.18  && <5
+    , aeson                 >=2.1   && <2.3
+    , bytestring            >=0.11  && <0.13
+    , containers            >=0.6   && <0.8
+    , directory             >=1.3   && <1.4
+    , filepath              >=1.4   && <1.6
+    , process               >=1.6   && <1.7
+    , text                  >=2.0   && <2.2
+    , time                  >=1.12  && <1.15
+    , unordered-containers  >=0.2   && <0.3
+    , vector                >=0.13  && <0.14
+
+library
+  import:         common-deps
+  hs-source-dirs: src
+  exposed-modules:
+    Alfrusco
+    Alfrusco.Types
+  build-depends:
+    , hslogger              >=1.3   && <1.4
+    , optparse-applicative  >=0.17  && <0.19
+
+test-suite alfrusco-test
+  import:         common-deps
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Spec.hs
+  build-depends:
+    , alfrusco
+    , hspec       >=2.10  && <2.12
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-N
+
+executable alfrusco-example-static-output
+  import:         common-deps
+  hs-source-dirs: examples
+  main-is:        StaticOutput.hs
+  build-depends:
+    , alfrusco
+
+executable alfrusco-example-url-items
+  import:         common-deps
+  hs-source-dirs: examples
+  main-is:        UrlItems.hs
+  build-depends:
+    , alfrusco
