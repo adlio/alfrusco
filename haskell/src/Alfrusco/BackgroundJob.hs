@@ -16,8 +16,9 @@ import Data.Text qualified as Text
 import Data.Time.Clock (NominalDiffTime, diffUTCTime, getCurrentTime)
 import Numeric (showHex)
 import System.Directory (createDirectoryIfMissing, doesFileExist, getModificationTime)
+import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.Process (CmdSpec (..), CreateProcess (..), StdStream (..), createProcess, shell)
+import System.Process (CmdSpec (..), CreateProcess (..), StdStream (..), createProcess, getPid, readCreateProcessWithExitCode, shell)
 
 import Alfrusco.Item (item, withSubtitle, withValid)
 import Alfrusco.Workflow (Workflow, appendItems, cacheDir, setRerun)
@@ -105,9 +106,29 @@ formatStaleness s =
 jobDirPath :: Workflow -> String -> FilePath
 jobDirPath wf jobId = cacheDir wf </> "jobs" </> jobId
 
--- | Check if a job is currently running by looking for a PID file.
+-- | Check if a job is currently running by reading the PID from the PID file
+-- and checking if that process is still alive.
 isJobRunning :: FilePath -> IO Bool
-isJobRunning dir = doesFileExist (dir </> "job.pid")
+isJobRunning dir = do
+  let pidFile = dir </> "job.pid"
+  exists <- doesFileExist pidFile
+  if exists
+    then do
+      content <- readFile pidFile
+      let pidStr = filter (/= '\n') content
+      case reads pidStr :: [(Int, String)] of
+        [(pid, "")] -> isProcessAlive pid
+        _           -> pure False  -- Invalid PID file content, treat as not running
+    else pure False
+
+-- | Check if a process with the given PID is still alive.
+-- Sends signal 0 which checks existence without actually signaling.
+isProcessAlive :: Int -> IO Bool
+isProcessAlive pid = do
+  -- Use kill -0 to check if process exists
+  (exitCode, _, _) <- readCreateProcessWithExitCode
+    (shell ("kill -0 " ++ show pid ++ " 2>/dev/null")) ""
+  pure (exitCode == ExitSuccess)
 
 -- | Get the staleness (time since last run) of a job.
 getStaleness :: FilePath -> IO (Maybe NominalDiffTime)
@@ -157,14 +178,18 @@ startJob dir cmd = do
 
   -- Write status as running
   writeFile statusFile "running"
-  -- Write PID file to indicate job is running
-  writeFile pidFile "running"
 
   -- Spawn the background process
-  _ <- createProcess (shell bashScript)
+  (_, _, _, ph) <- createProcess (shell bashScript)
     { std_in = NoStream
     , std_out = NoStream
     , std_err = NoStream
+    , create_group = True
     , delegate_ctlc = False
     }
-  pure ()
+
+  -- Get the actual PID and write it to the PID file
+  mPid <- getPid ph
+  case mPid of
+    Just pid -> writeFile pidFile (show pid)
+    Nothing  -> writeFile pidFile "0"  -- Fallback; isJobRunning will detect dead process

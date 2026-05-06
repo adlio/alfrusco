@@ -18,6 +18,7 @@ module Alfrusco.Workflow
   ) where
 
 import Data.IORef
+import Data.Sequence qualified as Seq
 import Data.Text (Text)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
@@ -52,25 +53,25 @@ newWorkflow config = do
     , wfSortAndFilter = sortRef
     }
 
--- | Append a single item to the workflow response.
+-- | Append a single item to the workflow response. O(1) amortized via Seq.
 appendItem :: Workflow -> Item -> IO ()
 appendItem wf i = modifyIORef' (wfResponse wf) $ \r ->
-  r {responseItems = responseItems r ++ [i]}
+  r {responseItems = responseItems r Seq.|> i}
 
--- | Append multiple items to the workflow response.
+-- | Append multiple items to the workflow response. O(log(min(n,m))) via Seq.
 appendItems :: Workflow -> [Item] -> IO ()
 appendItems wf items = modifyIORef' (wfResponse wf) $ \r ->
-  r {responseItems = responseItems r ++ items}
+  r {responseItems = responseItems r <> Seq.fromList items}
 
 -- | Prepend a single item to the workflow response.
 prependItem :: Workflow -> Item -> IO ()
 prependItem wf i = modifyIORef' (wfResponse wf) $ \r ->
-  r {responseItems = i : responseItems r}
+  r {responseItems = i Seq.<| responseItems r}
 
 -- | Prepend multiple items to the workflow response.
 prependItems :: Workflow -> [Item] -> IO ()
 prependItems wf items = modifyIORef' (wfResponse wf) $ \r ->
-  r {responseItems = items ++ responseItems r}
+  r {responseItems = Seq.fromList items <> responseItems r}
 
 -- | Set the filter keyword and enable sort-and-filter.
 setFilterKeyword :: Workflow -> Text -> IO ()

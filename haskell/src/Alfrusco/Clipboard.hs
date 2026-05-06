@@ -19,6 +19,7 @@ import Data.Text.Encoding qualified as TE
 import Data.Word (Word8)
 import Numeric (showHex)
 import System.Environment (lookupEnv)
+import System.Exit (ExitCode (..))
 import System.IO (stdout)
 import System.Process (readCreateProcessWithExitCode, shell)
 
@@ -61,8 +62,11 @@ copyMarkdownLinkToClipboard :: Text -> Text -> IO (Either AlfruscoError ())
 copyMarkdownLinkToClipboard title url = do
   let markdown = Text.unpack (formatMarkdownLink title url)
       cmd = "printf '%s' " ++ shellQuote markdown ++ " | pbcopy"
-  (_, _, _) <- readCreateProcessWithExitCode (shell cmd) ""
-  pure (Right ())
+  (exitCode, _, errOutput) <- readCreateProcessWithExitCode (shell cmd) ""
+  case exitCode of
+    ExitSuccess -> pure (Right ())
+    ExitFailure code -> pure (Left (ClipboardError
+      ("pbcopy failed with exit code " <> Text.pack (show code) <> ": " <> Text.pack errOutput)))
 
 -- | Copy a Rich Text link to the clipboard using osascript with hex-encoded HTML.
 -- Uses AppleScript to set the clipboard to include both plain text and HTML content.
@@ -77,8 +81,11 @@ copyRichTextLinkToClipboard title url = do
                ++ hexHtml
                ++ "\187}"
       cmd = "osascript -e " ++ shellQuote script
-  (_, _, _) <- readCreateProcessWithExitCode (shell cmd) ""
-  pure (Right ())
+  (exitCode, _, errOutput) <- readCreateProcessWithExitCode (shell cmd) ""
+  case exitCode of
+    ExitSuccess -> pure (Right ())
+    ExitFailure code -> pure (Left (ClipboardError
+      ("osascript failed with exit code " <> Text.pack (show code) <> ": " <> Text.pack errOutput)))
 
 -- | Hex-encode a ByteString to uppercase hex characters.
 hexEncode :: ByteString -> String

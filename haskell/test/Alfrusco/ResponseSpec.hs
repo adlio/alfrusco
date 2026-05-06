@@ -4,6 +4,7 @@ module Alfrusco.ResponseSpec (spec) where
 
 import Data.Aeson (encode, object, (.=))
 import Data.Aeson qualified as Aeson
+import Data.Sequence qualified as Seq
 import Test.Hspec
 
 import Alfrusco.Item (item, withSubtitle)
@@ -64,7 +65,7 @@ spec = describe "Alfrusco.Response" $ do
                 { responseRerun = Just 3
                 , responseCache = Just CacheSettings {cacheSeconds = Just 60, cacheLooseReload = Just True}
                 , responseSkipKnowledge = Just True
-                , responseItems = [item "Hello"]
+                , responseItems = Seq.singleton (item "Hello")
                 }
           decoded = Aeson.decode (encode r) :: Maybe Aeson.Value
           expected = Just $ object

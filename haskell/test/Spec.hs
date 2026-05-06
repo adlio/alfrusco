@@ -11,6 +11,7 @@ import qualified Alfrusco.ModifierSpec
 import qualified Alfrusco.ResponseSpec
 import qualified Alfrusco.SortAndFilterSpec
 import qualified Alfrusco.URLItemSpec
+import qualified Alfrusco.WorkflowSpec
 
 main :: IO ()
 main = hspec $ do
@@ -21,3 +22,4 @@ main = hspec $ do
   Alfrusco.URLItemSpec.spec
   Alfrusco.ConfigSpec.spec
   Alfrusco.ClipboardSpec.spec
+  Alfrusco.WorkflowSpec.spec

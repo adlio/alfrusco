@@ -8,12 +8,15 @@ module Alfrusco.Runnable
   , executeAsync
   ) where
 
+import Data.Foldable (toList)
 import Data.IORef (readIORef)
-import System.Exit (exitFailure)
+import Data.Sequence qualified as Seq
+import System.Exit (exitFailure, exitSuccess)
 import System.IO (Handle, hPutStrLn, stderr)
 
 import Alfrusco.Config (ConfigProvider (..))
 import Alfrusco.Error (IsWorkflowError (..))
+import Alfrusco.InternalHandlers (handle)
 import Alfrusco.Response (Response (..), writeResponse)
 import Alfrusco.SortAndFilter (filterAndSortItems)
 import Alfrusco.Workflow
@@ -27,17 +30,22 @@ class IsWorkflowError e => Runnable r e | r -> e where
 -- Logic:
 -- 1. Get config from the provider (exit on error).
 -- 2. Create a workflow (exit on error).
--- 3. Call run on the runnable.
--- 4. On Left, prepend the error item to the response.
--- 5. Finalize: apply sort/filter if keyword set, write response JSON to handle.
+-- 3. Handle internal commands (clipboard, workflow:* directory open). Exit early if handled.
+-- 4. Call run on the runnable.
+-- 5. On Left, prepend the error item to the response.
+-- 6. Finalize: apply sort/filter if keyword set, write response JSON to handle.
 execute :: (ConfigProvider p, Runnable r e) => p -> r -> Handle -> IO ()
 execute provider runnable writer = do
   wf <- setupWorkflow provider
-  result <- run runnable wf
-  case result of
-    Left e -> prependItem wf (errorItem e)
-    Right () -> pure ()
-  finalizeWorkflow wf writer
+  handled <- handle wf
+  if handled
+    then exitSuccess
+    else do
+      result <- run runnable wf
+      case result of
+        Left e -> prependItem wf (errorItem e)
+        Right () -> pure ()
+      finalizeWorkflow wf writer
 
 -- | Async variant of execute. In Haskell, IO is already concurrent-capable,
 -- so this has the same implementation as execute.
@@ -66,7 +74,7 @@ finalizeWorkflow wf writer = do
     then do
       mKeyword <- readIORef (wfKeyword wf)
       case mKeyword of
-        Just kw -> pure response {responseItems = filterAndSortItems (responseItems response) kw}
+        Just kw -> pure response {responseItems = Seq.fromList (filterAndSortItems (toList (responseItems response)) kw)}
         Nothing -> pure response
     else pure response
   writeResponse writer finalResponse

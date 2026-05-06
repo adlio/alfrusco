@@ -12,6 +12,8 @@ module Alfrusco.Response
 import Data.Aeson (ToJSON (..), (.=))
 import Data.Aeson qualified as Aeson
 import Data.ByteString.Lazy qualified as LBS
+import Data.Sequence (Seq)
+import Data.Sequence qualified as Seq
 import System.IO (Handle)
 
 import Alfrusco.Item (Item)
@@ -35,7 +37,7 @@ data Response = Response
   { responseRerun :: Maybe Double
   , responseCache :: Maybe CacheSettings
   , responseSkipKnowledge :: Maybe Bool
-  , responseItems :: [Item]
+  , responseItems :: Seq Item
   }
   deriving (Show, Eq)
 
@@ -45,8 +47,10 @@ instance ToJSON Response where
       [ maybe [] (\rr -> ["rerun" .= renderNumber rr]) (responseRerun r)
       , maybe [] (\c -> ["cache" .= c]) (responseCache r)
       , maybe [] (\sk -> ["skipknowledge" .= sk]) (responseSkipKnowledge r)
-      , ["items" .= responseItems r]
+      , ["items" .= toList (responseItems r)]
       ]
+    where
+      toList = foldr (:) []
 
 -- | Render a number as an integer if it is a whole number, otherwise as a float.
 renderNumber :: Double -> Aeson.Value
@@ -60,12 +64,12 @@ defaultResponse = Response
   { responseRerun = Nothing
   , responseCache = Nothing
   , responseSkipKnowledge = Nothing
-  , responseItems = []
+  , responseItems = Seq.empty
   }
 
 -- | Create a response with the given items.
 responseWithItems :: [Item] -> Response
-responseWithItems items = defaultResponse {responseItems = items}
+responseWithItems items = defaultResponse {responseItems = Seq.fromList items}
 
 -- | Write a response as JSON to a Handle.
 writeResponse :: Handle -> Response -> IO ()
