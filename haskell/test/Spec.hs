@@ -3,11 +3,21 @@
 module Main (main) where
 
 import Test.Hspec
-import Alfrusco
+
+import qualified Alfrusco.ClipboardSpec
+import qualified Alfrusco.ConfigSpec
+import qualified Alfrusco.ItemSpec
+import qualified Alfrusco.ModifierSpec
+import qualified Alfrusco.ResponseSpec
+import qualified Alfrusco.SortAndFilterSpec
+import qualified Alfrusco.URLItemSpec
 
 main :: IO ()
 main = hspec $ do
-  describe "Alfrusco" $ do
-    it "can create an item with a title" $ do
-      let i = item "Test"
-      itemTitle i `shouldBe` "Test"
+  Alfrusco.ItemSpec.spec
+  Alfrusco.ResponseSpec.spec
+  Alfrusco.ModifierSpec.spec
+  Alfrusco.SortAndFilterSpec.spec
+  Alfrusco.URLItemSpec.spec
+  Alfrusco.ConfigSpec.spec
+  Alfrusco.ClipboardSpec.spec

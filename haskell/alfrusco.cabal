@@ -34,10 +34,14 @@ library
   exposed-modules:
     Alfrusco
     Alfrusco.Arg
+    Alfrusco.BackgroundJob
+    Alfrusco.Clipboard
     Alfrusco.Config
     Alfrusco.Error
     Alfrusco.Icon
+    Alfrusco.InternalHandlers
     Alfrusco.Item
+    Alfrusco.Logging
     Alfrusco.Modifier
     Alfrusco.Response
     Alfrusco.Runnable
@@ -46,6 +50,7 @@ library
     Alfrusco.URLItem
     Alfrusco.Workflow
   build-depends:
+    , hashable              >=1.4   && <1.5
     , hslogger              >=1.3   && <1.4
     , optparse-applicative  >=0.17  && <0.19
 
@@ -54,6 +59,14 @@ test-suite alfrusco-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Spec.hs
+  other-modules:
+    Alfrusco.ItemSpec
+    Alfrusco.ResponseSpec
+    Alfrusco.ModifierSpec
+    Alfrusco.SortAndFilterSpec
+    Alfrusco.URLItemSpec
+    Alfrusco.ConfigSpec
+    Alfrusco.ClipboardSpec
   build-depends:
     , alfrusco
     , hspec       >=2.10  && <2.12
