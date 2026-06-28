@@ -6,16 +6,29 @@
 use alfrusco::simulator::{Severity, Simulator};
 
 /// Build the menu example binary once (shared across tests).
-fn menu_binary() -> &'static str {
-    static BUILD: std::sync::Once = std::sync::Once::new();
-    BUILD.call_once(|| {
-        let status = std::process::Command::new("cargo")
-            .args(["build", "--example", "menu"])
-            .status()
-            .expect("failed to run cargo build");
-        assert!(status.success(), "cargo build --example menu failed");
-    });
-    "target/debug/examples/menu"
+fn menu_binary() -> String {
+    let output = std::process::Command::new("cargo")
+        .args(["build", "--example", "menu", "--message-format=json"])
+        .output()
+        .expect("failed to run cargo build");
+    assert!(output.status.success(), "cargo build --example menu failed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for line in stdout.lines() {
+        if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
+            if msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-artifact")
+                && msg
+                    .get("target")
+                    .and_then(|t| t.get("name"))
+                    .and_then(|n| n.as_str())
+                    == Some("menu")
+            {
+                if let Some(exe) = msg.get("executable").and_then(|e| e.as_str()) {
+                    return exe.to_string();
+                }
+            }
+        }
+    }
+    panic!("could not find executable path for example 'menu' in cargo output");
 }
 
 #[test]

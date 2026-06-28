@@ -6,6 +6,35 @@
 use alfrusco::simulator::Simulator;
 use alfrusco::{Item, Runnable, Workflow};
 
+/// Returns the path to a built example binary, robust to any target directory.
+fn example_binary(name: &str) -> String {
+    let output = std::process::Command::new("cargo")
+        .args(["build", "--example", name, "--message-format=json"])
+        .output()
+        .expect("failed to run cargo build");
+    assert!(
+        output.status.success(),
+        "cargo build --example {name} failed"
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for line in stdout.lines() {
+        if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
+            if msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-artifact")
+                && msg
+                    .get("target")
+                    .and_then(|t| t.get("name"))
+                    .and_then(|n| n.as_str())
+                    == Some(name)
+            {
+                if let Some(exe) = msg.get("executable").and_then(|e| e.as_str()) {
+                    return exe.to_string();
+                }
+            }
+        }
+    }
+    panic!("could not find executable path for example '{name}' in cargo output");
+}
+
 /// A minimal test workflow that produces a fixed set of items.
 struct TestWorkflow {
     query: String,
@@ -77,7 +106,7 @@ fn simulator_run_in_process_empty_query() {
 fn simulator_invoke_subprocess_menu_top_level() {
     let sim = Simulator::for_workflow_dir("examples/menu_workflow")
         .unwrap()
-        .binary("target/debug/examples/menu");
+        .binary(example_binary("menu"));
 
     let screen = sim.invoke(&[]).unwrap();
     assert_eq!(screen.len(), 3);
@@ -90,7 +119,7 @@ fn simulator_invoke_subprocess_menu_top_level() {
 fn simulator_invoke_subprocess_menu_drill_in() {
     let sim = Simulator::for_workflow_dir("examples/menu_workflow")
         .unwrap()
-        .binary("target/debug/examples/menu");
+        .binary(example_binary("menu"));
 
     let screen = sim.invoke(&["fruits"]).unwrap();
     assert_eq!(screen.len(), 3);

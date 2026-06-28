@@ -287,6 +287,10 @@ fn resolve_conditional(
                 visited,
             );
         }
+        // Condition matched but its output port is unwired (no connection carries
+        // this source_output_uid). In Alfred, else fires ONLY when no condition
+        // matched — a matched-but-unwired output is a dead-end (clicking does nothing).
+        return ActionResult::DeadEnd;
     }
 
     // No condition matched → take the else branch.

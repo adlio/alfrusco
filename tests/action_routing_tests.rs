@@ -1,6 +1,39 @@
 use alfrusco::simulator::{ActionResult, Screen, Simulator};
 use alfrusco::{Item, Runnable, Workflow};
 
+/// Builds the menu example and returns its path, robust to any target directory
+/// (works under `cargo test`, `cargo llvm-cov`, custom `CARGO_TARGET_DIR`, etc.).
+///
+/// Uses `--message-format=json` to parse the actual executable path from cargo's output.
+fn example_binary(name: &str) -> String {
+    let output = std::process::Command::new("cargo")
+        .args(["build", "--example", name, "--message-format=json"])
+        .output()
+        .expect("failed to run cargo build");
+    assert!(
+        output.status.success(),
+        "cargo build --example {name} failed"
+    );
+    // Parse JSON lines to find the compiler-artifact with the executable
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for line in stdout.lines() {
+        if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
+            if msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-artifact")
+                && msg
+                    .get("target")
+                    .and_then(|t| t.get("name"))
+                    .and_then(|n| n.as_str())
+                    == Some(name)
+            {
+                if let Some(exe) = msg.get("executable").and_then(|e| e.as_str()) {
+                    return exe.to_string();
+                }
+            }
+        }
+    }
+    panic!("could not find executable path for example '{name}' in cargo output");
+}
+
 /// A test workflow that produces items with specific valid/autocomplete settings.
 struct TestMenuWorkflow {
     /// If true, produces items with valid:false + autocomplete (loopback pattern).
@@ -149,7 +182,7 @@ fn action_first_on_empty_screen_returns_none() {
 fn action_routing_via_subprocess_top_level() {
     let sim = Simulator::for_workflow_dir("examples/menu_workflow")
         .unwrap()
-        .binary("target/debug/examples/menu")
+        .binary(example_binary("menu"))
         .source_filter("SF-MAIN-001");
 
     let screen = sim.invoke(&[]).unwrap();
@@ -168,7 +201,7 @@ fn action_routing_via_subprocess_top_level() {
 fn action_routing_via_subprocess_sub_level() {
     let sim = Simulator::for_workflow_dir("examples/menu_workflow")
         .unwrap()
-        .binary("target/debug/examples/menu")
+        .binary(example_binary("menu"))
         .source_filter("SF-SUB-001");
 
     let screen = sim.invoke(&["fruits"]).unwrap();

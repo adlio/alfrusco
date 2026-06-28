@@ -11,16 +11,29 @@ use alfrusco::simulator::{Severity, Simulator, WorkflowGraph};
 use std::sync::Arc;
 
 /// Build the menu example binary once (shared across tests).
-fn menu_binary() -> &'static str {
-    static BUILD: std::sync::Once = std::sync::Once::new();
-    BUILD.call_once(|| {
-        let status = std::process::Command::new("cargo")
-            .args(["build", "--example", "menu"])
-            .status()
-            .expect("failed to run cargo build");
-        assert!(status.success(), "cargo build --example menu failed");
-    });
-    "target/debug/examples/menu"
+fn menu_binary() -> String {
+    let output = std::process::Command::new("cargo")
+        .args(["build", "--example", "menu", "--message-format=json"])
+        .output()
+        .expect("failed to run cargo build");
+    assert!(output.status.success(), "cargo build --example menu failed");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    for line in stdout.lines() {
+        if let Ok(msg) = serde_json::from_str::<serde_json::Value>(line) {
+            if msg.get("reason").and_then(|r| r.as_str()) == Some("compiler-artifact")
+                && msg
+                    .get("target")
+                    .and_then(|t| t.get("name"))
+                    .and_then(|n| n.as_str())
+                    == Some("menu")
+            {
+                if let Some(exe) = msg.get("executable").and_then(|e| e.as_str()) {
+                    return exe.to_string();
+                }
+            }
+        }
+    }
+    panic!("could not find executable path for example 'menu' in cargo output");
 }
 
 /// Fixture (i): External-Trigger drill-in — audit MUST be clean.
@@ -124,4 +137,59 @@ fn matrix_dangling_loopback_is_dead_end() {
         action.is_dead_end(),
         "expected DeadEnd for dangling loopback, got: {action:?}"
     );
+}
+
+/// Fixture (iv): Unwired-branch (matched condition output has NO connection) — audit MUST flag ERROR.
+#[test]
+fn matrix_unwired_branch_audit_flags_error() {
+    let sim = Simulator::for_workflow_dir("tests/fixtures/menu_unwired_branch_workflow")
+        .unwrap()
+        .binary(menu_binary());
+
+    let diagnostics = sim.dynamic_audit().unwrap();
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity >= Severity::Error)
+        .collect();
+    assert!(
+        !errors.is_empty(),
+        "fixture (iv) unwired-branch MUST flag dead-end errors"
+    );
+    assert!(
+        errors.iter().any(|d| d.message.contains("dead-end")),
+        "error message must mention dead-end, got: {errors:#?}"
+    );
+}
+
+/// Fixture (iv): Verify matched-but-unwired condition = DeadEnd.
+#[test]
+fn matrix_unwired_branch_is_dead_end() {
+    let graph =
+        WorkflowGraph::from_plist_file("tests/fixtures/menu_unwired_branch_workflow/info.plist")
+            .unwrap();
+
+    // arg="fruits" matches the condition, but COND-OUT-LOOPBACK has no connection
+    let json = r#"{"items":[{"title":"Fruits","arg":"fruits","valid":true}]}"#;
+    let screen = alfrusco::simulator::Screen::from_json(json).unwrap();
+    let screen = screen.with_context(Arc::new(graph), "SF-MAIN-001".to_string());
+    let action = screen.action(0).unwrap();
+    assert!(
+        action.is_dead_end(),
+        "expected DeadEnd for unwired branch, got: {action:?}"
+    );
+}
+
+/// Fixture (iv): Non-matching arg routes to else branch (RanScript) — NOT a dead-end.
+#[test]
+fn matrix_unwired_branch_else_routes_to_run_script() {
+    let graph =
+        WorkflowGraph::from_plist_file("tests/fixtures/menu_unwired_branch_workflow/info.plist")
+            .unwrap();
+
+    // arg="something-else" does NOT match any condition → else → RUN-SCRIPT-001
+    let json = r#"{"items":[{"title":"Action","arg":"something-else","valid":true}]}"#;
+    let screen = alfrusco::simulator::Screen::from_json(json).unwrap();
+    let screen = screen.with_context(Arc::new(graph), "SF-MAIN-001".to_string());
+    let action = screen.action(0).unwrap();
+    action.assert_runs_script();
 }

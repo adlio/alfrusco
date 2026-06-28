@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help test test-without-nextest build release workflow clean coverage coverage-html coverage-ci lint fmt fmt-check clippy clippy-fix doc doc-check check all ci ensure-tools
+.PHONY: help test test-without-nextest build release workflow clean coverage coverage-html coverage-ci coverage-ci-check lint fmt fmt-check clippy clippy-fix doc doc-check check all ci ensure-tools
 
 # Tool installation helpers
 CARGO_NEXTEST := $(shell command -v cargo-nextest 2>/dev/null)
@@ -86,6 +86,11 @@ coverage-ci: ensure-tools ## Generate LCOV coverage for CI
 	@# Clipboard tests require --test-threads 1 (shared resource)
 	cargo llvm-cov --all-features --examples --tests --lcov --output-path lcov.info -- --test-threads 1
 
+coverage-ci-check: ensure-tools ## Verify tests pass under llvm-cov target dir (catches target-dir-sensitive paths)
+	@# Runs tests under llvm-cov's target dir to surface hardcoded target/debug paths
+	cargo llvm-cov clean --workspace
+	cargo llvm-cov --all-features --examples --tests --no-report -- --test-threads 1
+
 all: ensure-tools fmt lint build test ## Format, lint, build, and test
 
-ci: ensure-tools fmt-check lint build doc-check test ## Full CI pipeline (for hooks)
+ci: ensure-tools fmt-check lint build doc-check test coverage-ci-check ## Full CI pipeline (for hooks)
