@@ -28,10 +28,9 @@ fn test_background_job_command_spawn_error() {
     assert!(!pid_file.exists());
 }
 
-/// Test that simulates environment variable errors in config
+/// Test that missing env vars trigger graceful fallback (not errors)
 #[test]
-fn test_config_env_var_errors() {
-    // Test each required environment variable
+fn test_config_env_var_fallback_on_missing() {
     let required_vars = [
         "alfred_workflow_bundleid",
         "alfred_workflow_cache",
@@ -56,12 +55,12 @@ fn test_config_env_var_errors() {
             let provider = config::AlfredEnvProvider;
             let result = provider.config();
 
-            // Verify that the result is an error
-            assert!(result.is_err());
-
-            // Verify that the error message mentions the missing variable
-            let error = result.unwrap_err();
-            assert!(error.to_string().contains(var));
+            // With the self-locating config fallback, missing env vars
+            // no longer cause errors — the provider falls back gracefully.
+            assert!(
+                result.is_ok(),
+                "Expected fallback for missing {var}, got error: {result:?}"
+            );
         });
     }
 }

@@ -24,12 +24,14 @@ const VAR_WORKFLOW_UID: &str = "alfred_workflow_uid";
 const VAR_WORKFLOW_KEYWORD: &str = "alfred_workflow_keyword";
 
 #[test]
-fn test_alfred_env_provider_missing_bundleid() {
+fn test_alfred_env_provider_missing_vars_falls_back() {
+    // With env vars partially missing, AlfredEnvProvider should NOT error —
+    // it falls back to tier 2 (info.plist) or tier 3 (temp dirs).
     with_vars(
         [
             (VAR_WORKFLOW_CACHE, Some("/made/up/cache_dir")),
             (VAR_WORKFLOW_DATA, Some("/made/up/data_dir")),
-            (VAR_WORKFLOW_BUNDLEID, None), // Missing bundleid
+            (VAR_WORKFLOW_BUNDLEID, None::<&str>), // Missing bundleid
             (VAR_VERSION, Some("5.0")),
             (VAR_VERSION_BUILD, Some("2058")),
             (VAR_WORKFLOW_NAME, Some("Test Workflow")),
@@ -37,68 +39,32 @@ fn test_alfred_env_provider_missing_bundleid() {
         || {
             let provider = AlfredEnvProvider;
             let result = provider.config();
-            assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("bundleid"));
+            // Should succeed via fallback, not error
+            assert!(result.is_ok(), "Expected fallback, got error: {result:?}");
         },
     );
 }
 
 #[test]
-fn test_alfred_env_provider_missing_version() {
+fn test_alfred_env_provider_no_env_vars_at_all() {
+    // With NO Alfred env vars, the provider should produce a usable fallback config.
     with_vars(
         [
-            (VAR_WORKFLOW_CACHE, Some("/made/up/cache_dir")),
-            (VAR_WORKFLOW_DATA, Some("/made/up/data_dir")),
-            (VAR_WORKFLOW_BUNDLEID, Some("com.test.workflow")),
-            (VAR_VERSION, None), // Missing version
-            (VAR_VERSION_BUILD, Some("2058")),
-            (VAR_WORKFLOW_NAME, Some("Test Workflow")),
+            (VAR_WORKFLOW_CACHE, None::<&str>),
+            (VAR_WORKFLOW_DATA, None::<&str>),
+            (VAR_WORKFLOW_BUNDLEID, None::<&str>),
+            (VAR_VERSION, None::<&str>),
+            (VAR_VERSION_BUILD, None::<&str>),
+            (VAR_WORKFLOW_NAME, None::<&str>),
+            (VAR_DEBUG, None::<&str>),
         ],
         || {
             let provider = AlfredEnvProvider;
             let result = provider.config();
-            assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("version"));
-        },
-    );
-}
-
-#[test]
-fn test_alfred_env_provider_missing_version_build() {
-    with_vars(
-        [
-            (VAR_WORKFLOW_CACHE, Some("/made/up/cache_dir")),
-            (VAR_WORKFLOW_DATA, Some("/made/up/data_dir")),
-            (VAR_WORKFLOW_BUNDLEID, Some("com.test.workflow")),
-            (VAR_VERSION, Some("5.0")),
-            (VAR_VERSION_BUILD, None), // Missing version_build
-            (VAR_WORKFLOW_NAME, Some("Test Workflow")),
-        ],
-        || {
-            let provider = AlfredEnvProvider;
-            let result = provider.config();
-            assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("version_build"));
-        },
-    );
-}
-
-#[test]
-fn test_alfred_env_provider_missing_workflow_name() {
-    with_vars(
-        [
-            (VAR_WORKFLOW_CACHE, Some("/made/up/cache_dir")),
-            (VAR_WORKFLOW_DATA, Some("/made/up/data_dir")),
-            (VAR_WORKFLOW_BUNDLEID, Some("com.test.workflow")),
-            (VAR_VERSION, Some("5.0")),
-            (VAR_VERSION_BUILD, Some("2058")),
-            (VAR_WORKFLOW_NAME, None), // Missing workflow_name
-        ],
-        || {
-            let provider = AlfredEnvProvider;
-            let result = provider.config();
-            assert!(result.is_err());
-            assert!(result.unwrap_err().to_string().contains("workflow_name"));
+            assert!(result.is_ok(), "Expected fallback, got error: {result:?}");
+            let config = result.unwrap();
+            assert!(!config.workflow_bundleid.is_empty());
+            assert!(!config.workflow_name.is_empty());
         },
     );
 }
