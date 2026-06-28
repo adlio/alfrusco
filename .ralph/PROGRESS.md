@@ -15,7 +15,7 @@ Evidence-required: check a box ONLY after pasting the milestone's behavioural ev
 - [x] **R3 — Terminal classification + dead-end-only error.** DrilledIn / OpenedUrl / RanScript /
       TypedAutocomplete = OK; DeadEnd (dangling matched-branch output) = the ONLY hard error. Remove
       "nav→RunScript ⇒ error". Evidence: 3-fixture matrix — flags ONLY the dangling-loopback fixture.
-- [ ] **R4 — Acceptance matrix + README routing-model docs + polish.** README "How the audit models
+- [x] **R4 — Acceptance matrix + README routing-model docs + polish.** README "How the audit models
       routing" section; `make ci` green; IP-clean grep empty. Evidence: ci + grep + audit matrix.
 
 ## Validation gates (DX Reviewer / Code Simplifier / Test Coverage, per milestone)
@@ -163,6 +163,33 @@ dynamic_audit_tests:
 
 ### `make ci` status: ✅ GREEN (318 tests pass)
 
+## R4 Evidence
+
+### README "How the Audit Models Routing" section: ✅ Added
+
+Covers: matchmode table, External Trigger re-entry, terminal classification, DeadEnd as the single error.
+
+### CHANGELOG [Unreleased] entry: ✅ Added
+
+Documents: faithful routing in dynamic audit, new ObjectKind variants, MatchMode, Condition.
+
+### `make ci` status: ✅ GREEN (318 tests pass)
+
+### IP-clean grep result: ✅ EMPTY (no matches)
+
+```
+$ grep -ri 'taskei\|amazon\|kitchen\|midway' --include='*.rs' --include='*.toml' --include='*.md' --include='*.plist' . --exclude-dir=.ralph --exclude-dir=target --exclude-dir=.git
+(no output — exit code 1)
+```
+
+### Final 3-fixture audit matrix (all in one place)
+
+| # | Fixture | Description | `audit --binary` result |
+|---|---------|-------------|------------------------|
+| i | `tests/fixtures/menu_external_trigger_workflow/` | Drill-in via CallExternalTrigger → ExternalTrigger → SF | ✅ Clean (0 errors) |
+| ii | `tests/fixtures/menu_misrouted_workflow/` | Nav items → RanScript (act-and-exit) | ✅ Clean (0 errors) |
+| iii | `tests/fixtures/menu_dangling_workflow/` | Matched branch → nonexistent UID (dangling) | ❌ ERROR (dead-end flagged) |
+
 ## Iteration log
 
 - 2026-06-28: R1 implemented — MatchMode enum, Condition struct, sourceoutputuid parsing,
@@ -175,3 +202,5 @@ dynamic_audit_tests:
 - 2026-06-28: R3 implemented — dynamic_audit() now only flags DeadEnd. RanScript/OpenedUrl are
   legitimate act-and-exit (never flagged). New dangling-loopback fixture + 6-test acceptance
   matrix proving ONLY fixture (iii) is flagged. `make ci` green (318 tests). Commit: `1f6d5eb`.
+- 2026-06-28: R4 implemented — README "How the Audit Models Routing" section + CHANGELOG
+  [Unreleased] entry. `make ci` green (318 tests). IP-clean grep empty. Commit: `cd99e8e`.
