@@ -412,6 +412,72 @@ mod tests {
 }
 ```
 
+### Testing Workflow Navigation (Simulator)
+
+For testing that actioning items produces correct navigation outcomes (drill-in, URL
+open, dead-ends), use the `simulator` module. It parses your real `info.plist` and
+walks the graph without needing the Alfred UI:
+
+```rust
+use alfrusco::simulator::{ActionResult, Simulator};
+use alfrusco::{Item, Runnable, Workflow};
+
+struct MyMenuWorkflow { category: Option<String> }
+
+impl Runnable for MyMenuWorkflow {
+    type Error = alfrusco::Error;
+    fn run(self, wf: &mut Workflow) -> Result<(), Self::Error> {
+        match self.category.as_deref() {
+            Some("fruits") => {
+                wf.append_item(Item::new("Apple").arg("https://example.com/apple").valid(true));
+            }
+            _ => {
+                wf.append_item(Item::new("Fruits").arg("fruits").var("category", "fruits").valid(true));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn test_navigation_drill_in() {
+    // Point at your workflow directory (with info.plist)
+    let sim = Simulator::for_workflow_dir("workflow")
+        .unwrap()
+        .source_filter("SF-MAIN-001");
+
+    // Run in-process — no compiled binary or deployment needed
+    let screen = sim.run_in_process(MyMenuWorkflow { category: None }).unwrap();
+    screen.assert_renders();
+
+    // Verify the action routes to a sub-filter (drill-in)
+    let action = screen.action_first().unwrap();
+    action.assert_drills_in();
+}
+
+#[test]
+fn test_navigation_opens_url() {
+    let sim = Simulator::for_workflow_dir("workflow")
+        .unwrap()
+        .source_filter("SF-SUB-001");
+
+    let screen = sim.run_in_process(MyMenuWorkflow { category: Some("fruits".into()) }).unwrap();
+    let action = screen.action_first().unwrap();
+    action.assert_opens_url();
+}
+```
+
+The `alfrusco-simulator` CLI can also be used for ad-hoc auditing:
+
+```bash
+# Audit a workflow graph for navigation defects
+alfrusco-simulator audit ./workflow
+
+# Walk a workflow and show items with routing
+alfrusco-simulator walk ./workflow --binary target/debug/myworkflow
+alfrusco-simulator walk ./workflow --binary target/debug/myworkflow --source-filter SF-SUB-001 fruits
+```
+
 ## Examples
 
 The `examples/` directory contains runnable examples. They require Alfred environment variables:
