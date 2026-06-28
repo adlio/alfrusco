@@ -17,6 +17,7 @@ mod workflow;
 pub mod clipboard;
 pub mod config;
 pub mod internal_handlers;
+pub mod simulator;
 
 pub use arg::Arg;
 pub use error::{Error, Result, WorkflowError};
