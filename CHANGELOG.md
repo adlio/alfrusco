@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-28
+
+### Added
+- **Headless workflow simulator** (`alfrusco::simulator`) for deterministic, UI-less testing of workflow navigation:
+  - `WorkflowGraph` — parse an `info.plist` and analyze its object/connection graph (reachability, keyword lookup, navigation audit).
+  - `Simulator` — invoke a workflow from a directory, in-process (`run_in_process`) or as a subprocess (`invoke` / `invoke_script_filter`), with builder overrides for cache/data/binary.
+  - `Screen` / `ScreenItem` / `ActionResult` — inspect rendered items and assert action routing (`assert_drills_in`, `assert_opens_url`, …).
+  - Static and dynamic navigation audits that detect drill-in items misrouted to a Run Script / Open URL instead of another Script Filter.
+- **`alfrusco-simulator` CLI** — `audit` and `walk` subcommands for auditing a workflow's navigation graph.
+- **Self-locating configuration** — `AlfredEnvProvider` now resolves config in three tiers (env vars → infer from the binary's location + adjacent `info.plist` → ephemeral temp directories with an STDERR warning), so a workflow binary no longer panics when run without Alfred's environment variables (terminal, cron, CI, tests).
+- `examples/menu.rs` — a generic hierarchical-menu workflow demonstrating the drill-in pattern.
+
+### Changed
+- `AlfredEnvProvider` no longer exits on missing Alfred environment variables; it falls back to inferred or temporary configuration (see Self-locating configuration).
+
+### Dependencies
+- Added `plist` for parsing Alfred `info.plist` files.
+
 ## [0.3.0] - 2026-01-08
 
 ### Added
@@ -82,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fuzzy filtering and sorting
 - Comprehensive error handling
 
-[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/adlio/alfrusco/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/adlio/alfrusco/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/adlio/alfrusco/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/adlio/alfrusco/compare/v0.1.9...v0.2.0
