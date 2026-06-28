@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Faithful routing in dynamic audit** — the audit now models Alfred's actual routing semantics:
+  - Evaluates Conditional nodes' `matchstring`/`matchmode`/`matchcasesensitive` against the actioned item's `arg` (instead of heuristically assuming "carries variables ⇒ navigation").
+  - Resolves External Trigger re-entry (`CallExternalTrigger` → matching `ExternalTrigger` input → Script Filter) as a legitimate drill-in.
+  - `RanScript` and `OpenedUrl` outcomes are **no longer flagged** — they are intentional act-and-exit terminals.
+  - **Only `DeadEnd`** (a matched conditional branch whose output connects to a non-existent object or has no connection) is an error.
+
+### Added
+- `ObjectKind::CallExternalTrigger` and `ObjectKind::ExternalTrigger` — new graph node kinds.
+- `WorkflowGraph::external_trigger_uid()` — resolve a trigger ID to its input node UID.
+- `MatchMode` enum with `evaluate()` — faithful matchmode evaluation for all 7 Alfred conditional modes.
+- `Condition` struct — parsed conditional branch configuration.
+
 ## [0.4.0] - 2026-06-28
 
 ### Added

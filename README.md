@@ -478,6 +478,57 @@ alfrusco-simulator walk ./workflow --binary target/debug/myworkflow
 alfrusco-simulator walk ./workflow --binary target/debug/myworkflow --source-filter SF-SUB-001 fruits
 ```
 
+#### How the Audit Models Routing
+
+The dynamic audit (`audit --binary`) faithfully models Alfred's routing semantics.
+When a user actions an item, Alfred routes through the workflow graph using
+conditionals and connections. The audit classifies each outcome and only flags
+genuine dead-ends — never legitimate terminal actions.
+
+**Conditional routing (matchmode evaluation)**
+
+At each Conditional node, the item's `arg` is evaluated against conditions in order:
+
+| Matchmode | Name           | Semantics                                      |
+|-----------|----------------|------------------------------------------------|
+| 0         | Is             | Exact equality (empty pattern → "is empty")    |
+| 1         | IsNot          | Not equal (empty pattern → "is not empty")     |
+| 2         | Contains       | Substring match                                |
+| 3         | DoesNotContain | No substring match                             |
+| 4         | StartsWith     | Prefix match                                   |
+| 5         | EndsWith       | Suffix match                                   |
+| 6         | MatchesRegex   | Regular expression match                       |
+
+The first matching condition's output port determines which connection to follow.
+If no condition matches, the else branch is taken.
+
+**External Trigger re-entry (drill-in via triggers)**
+
+A `CallExternalTrigger` output resolves to its matching `ExternalTrigger` input
+(by trigger ID) and continues traversal from there. The chain:
+
+```
+item → Conditional → CallExternalTrigger → ExternalTrigger → Script Filter
+```
+
+classifies as **DrilledIn** — a legitimate drill-in navigation, not a dead-end.
+
+**Terminal classification**
+
+| Outcome           | Meaning                            | Audit result |
+|-------------------|------------------------------------|--------------|
+| DrilledIn         | Reached another Script Filter      | ✅ OK        |
+| TypedAutocomplete | `valid:false` + autocomplete       | ✅ OK        |
+| RanScript         | Reached a Run Script (act-and-exit)| ✅ OK        |
+| OpenedUrl         | Reached Open URL (act-and-exit)    | ✅ OK        |
+| DeadEnd           | Dangling/unconnected branch output | ❌ **ERROR** |
+
+**Only `DeadEnd` is an error.** This occurs when the matched conditional branch
+connects to a non-existent object or has no connection at all — actioning the item
+silently does nothing. Items that route to Run Script or Open URL are intentional
+act-and-exit patterns (e.g. copy to clipboard, open a URL, run a mutation) and are
+never flagged.
+
 ## Examples
 
 The `examples/` directory contains runnable examples. They require Alfred environment variables:

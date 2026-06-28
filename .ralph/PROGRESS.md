@@ -12,7 +12,7 @@ Evidence-required: check a box ONLY after pasting the milestone's behavioural ev
 - [x] **R2 — External Trigger drill-in resolution.** `callexternaltrigger` → matching
       `trigger.external` input (by trigger id) → Script Filter == drill-in. Generic
       `menu_external_trigger` fixture. Evidence: reachability/action report `DrilledIn`; audit clean.
-- [ ] **R3 — Terminal classification + dead-end-only error.** DrilledIn / OpenedUrl / RanScript /
+- [x] **R3 — Terminal classification + dead-end-only error.** DrilledIn / OpenedUrl / RanScript /
       TypedAutocomplete = OK; DeadEnd (dangling matched-branch output) = the ONLY hard error. Remove
       "nav→RunScript ⇒ error". Evidence: 3-fixture matrix — flags ONLY the dangling-loopback fixture.
 - [ ] **R4 — Acceptance matrix + README routing-model docs + polish.** README "How the audit models
@@ -122,6 +122,47 @@ test result: ok. 8 passed; 0 failed; 0 ignored
 
 ### `make ci` status: ✅ GREEN (311 tests pass)
 
+## R3 Evidence
+
+### Terminal classification taxonomy (implemented in dynamic_audit)
+
+| ActionResult        | Classification | Audit result |
+|---------------------|---------------|--------------|
+| DrilledIn           | Drill-in      | ✅ OK        |
+| TypedAutocomplete   | Drill-in      | ✅ OK        |
+| RanScript           | Act-and-exit  | ✅ OK        |
+| OpenedUrl           | Act-and-exit  | ✅ OK        |
+| DeadEnd             | Dead-end      | ❌ ERROR     |
+
+### 3-fixture acceptance matrix
+
+| # | Fixture                       | Item arg   | Route                           | Audit result |
+|---|-------------------------------|------------|----------------------------------|--------------|
+| i | menu_external_trigger_workflow | "loopback" | → COND → CallExternalTrigger → ExternalTrigger → SF-SUB-001 | ✅ Clean |
+| ii| menu_misrouted_workflow        | "fruits"   | → RUN-SCRIPT-001 (act-and-exit) | ✅ Clean |
+| iii| menu_dangling_workflow        | "fruits"   | → COND → NONEXISTENT-SF-999 (dangling) | ❌ ERROR (dead-end) |
+
+### Test output (6 matrix tests + 5 dynamic audit tests, all pass)
+
+```
+terminal_classification_tests:
+  matrix_external_trigger_audit_clean ... ok
+  matrix_external_trigger_drills_in ... ok
+  matrix_act_and_exit_audit_clean ... ok
+  matrix_act_and_exit_routes_to_run_script ... ok
+  matrix_dangling_loopback_audit_flags_error ... ok
+  matrix_dangling_loopback_is_dead_end ... ok
+
+dynamic_audit_tests:
+  dynamic_audit_good_menu_is_clean ... ok
+  dynamic_audit_act_and_exit_not_flagged ... ok
+  dynamic_audit_dangling_loopback_is_dead_end ... ok
+  invoke_script_filter_uses_scriptfile ... ok
+  invoke_script_filter_sub_level ... ok
+```
+
+### `make ci` status: ✅ GREEN (318 tests pass)
+
 ## Iteration log
 
 - 2026-06-28: R1 implemented — MatchMode enum, Condition struct, sourceoutputuid parsing,
@@ -131,3 +172,6 @@ test result: ok. 8 passed; 0 failed; 0 ignored
   external_trigger_uid() lookup, resolve_external_trigger() in action routing,
   reachable_kinds() follows trigger boundaries. Generic fixture + 8 new tests, all pass.
   `make ci` green (311 tests). IP-clean grep empty. Commit: `f600031`.
+- 2026-06-28: R3 implemented — dynamic_audit() now only flags DeadEnd. RanScript/OpenedUrl are
+  legitimate act-and-exit (never flagged). New dangling-loopback fixture + 6-test acceptance
+  matrix proving ONLY fixture (iii) is flagged. `make ci` green (318 tests). Commit: `1f6d5eb`.
