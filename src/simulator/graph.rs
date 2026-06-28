@@ -52,6 +52,15 @@ pub struct ObjectNode {
     pub keyword: Option<String>,
     /// The display title of this object.
     pub title: Option<String>,
+    /// Raw config key-value pairs (string values only).
+    config_strings: HashMap<String, String>,
+}
+
+impl ObjectNode {
+    /// Returns a string config value by key (e.g. `"url"` for Open URL actions).
+    pub fn config_value(&self, key: &str) -> Option<&str> {
+        self.config_strings.get(key).map(String::as_str)
+    }
 }
 
 /// A directed edge between two objects, optionally gated by a modifier key combination.
@@ -193,11 +202,21 @@ impl WorkflowGraph {
             .and_then(|v| v.as_string())
             .map(String::from);
 
+        // Collect all string-valued config entries
+        let config_strings = config
+            .map(|c| {
+                c.iter()
+                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                    .collect()
+            })
+            .unwrap_or_default();
+
         Some(ObjectNode {
             uid,
             kind,
             keyword,
             title,
+            config_strings,
         })
     }
 
