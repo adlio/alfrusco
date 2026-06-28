@@ -21,8 +21,8 @@ const VAR_WORKFLOW_VERSION: &str = "alfred_workflow_version";
 const VAR_WORKFLOW_KEYWORD: &str = "alfred_workflow_keyword";
 const VAR_DEBUG: &str = "alfred_debug";
 
-const DEFAULT_ALFRED_VERSION: &str = "5.5";
-const DEFAULT_ALFRED_VERSION_BUILD: &str = "2300";
+pub(crate) const DEFAULT_ALFRED_VERSION: &str = "5.5";
+pub(crate) const DEFAULT_ALFRED_VERSION_BUILD: &str = "2300";
 
 /// `WorkflowConfig` holds the configuration values for the current workflow.
 ///

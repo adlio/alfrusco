@@ -29,5 +29,8 @@ lcov.info
 
 spec.md
 
+# Ralph loop scaffolding (local-only)
+.ralph/
+
 # Mutation testing artifacts
 **/mutants.out*/

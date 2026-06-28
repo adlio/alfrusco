@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
-use crate::config::{read_plist_metadata, ConfigProvider, WorkflowConfig};
+use crate::config::{
+    read_plist_metadata, ConfigProvider, WorkflowConfig, DEFAULT_ALFRED_VERSION,
+    DEFAULT_ALFRED_VERSION_BUILD,
+};
 use crate::error::WorkflowError;
 use crate::workflow::{finalize_workflow, setup_workflow};
 use crate::Runnable;
@@ -178,8 +181,7 @@ impl Simulator {
     /// Invokes the workflow binary as a subprocess with the given arguments
     /// and returns the rendered [`Screen`].
     ///
-    /// The binary path defaults to `target/debug/<bundleid-last-component>` inferred
-    /// from the workflow directory, but can be overridden via [`Simulator::binary`].
+    /// Requires a binary path set via [`Simulator::binary`].
     ///
     /// Alfred environment variables are injected into the subprocess so the binary
     /// can resolve its configuration.
@@ -187,7 +189,7 @@ impl Simulator {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - No binary path is set or inferred
+    /// - No binary path has been set via [`Simulator::binary`]
     /// - The binary fails to execute
     /// - The output is not valid Script Filter JSON
     ///
@@ -217,16 +219,21 @@ impl Simulator {
     ///
     /// This is the faithful invocation mode: it runs the exact command Alfred
     /// would run for this Script Filter, with the query passed as arguments.
-    /// The binary is resolved as `<workflow_dir>/<scriptfile>` when a `scriptfile`
-    /// is configured, or falls back to the binary set via [`Simulator::binary`].
+    ///
+    /// Resolution order:
+    /// 1. If `scriptfile` is configured and exists at `<workflow_dir>/<scriptfile>`,
+    ///    run it directly with the query as arguments.
+    /// 2. If `script` is configured (inline shell command), execute it via `/bin/sh`
+    ///    with `$1`/`{query}` substituted with the first query argument.
+    /// 3. Fall back to the binary set via [`Simulator::binary`].
     ///
     /// # Errors
     ///
     /// Returns an error if:
     /// - The UID does not correspond to a Script Filter in the graph
-    /// - No `scriptfile` is configured and no binary was set
+    /// - No `scriptfile`, `script`, or fallback binary is available
     /// - The resolved binary does not exist
-    /// - The binary fails to execute
+    /// - The binary/script fails to execute
     pub fn invoke_script_filter(
         &self,
         filter_uid: &str,
@@ -236,30 +243,31 @@ impl Simulator {
             SimulatorError::OutputParse(format!("no object with UID '{filter_uid}'"))
         })?;
 
-        // Determine binary: prefer scriptfile from plist if it exists at the resolved path,
-        // otherwise fall back to explicit binary
-        let binary = if let Some(script_file) = node.script_file() {
+        // 1. Try scriptfile
+        if let Some(script_file) = node.script_file() {
             let resolved = self.workflow_dir.join(script_file);
             if resolved.is_file() {
-                resolved
-            } else if let Some(b) = &self.binary {
-                b.clone()
-            } else {
-                return Err(SimulatorError::BinaryNotFound(resolved));
+                let screen = self.invoke_binary(&resolved, args)?;
+                return Ok(screen.with_context(Arc::clone(&self.graph), filter_uid.to_string()));
             }
-        } else if let Some(binary) = &self.binary {
-            binary.clone()
-        } else {
-            return Err(SimulatorError::NoBinary);
-        };
-
-        if !binary.is_file() {
-            return Err(SimulatorError::BinaryNotFound(binary));
         }
 
-        // Use this filter as the source for action routing
-        let screen = self.invoke_binary(&binary, args)?;
-        Ok(screen.with_context(Arc::clone(&self.graph), filter_uid.to_string()))
+        // 2. Try inline script (execute via shell with $1 substitution)
+        if let Some(inline_script) = node.script() {
+            let screen = self.invoke_inline_script(inline_script, args)?;
+            return Ok(screen.with_context(Arc::clone(&self.graph), filter_uid.to_string()));
+        }
+
+        // 3. Fall back to explicit binary
+        if let Some(binary) = &self.binary {
+            if !binary.is_file() {
+                return Err(SimulatorError::BinaryNotFound(binary.clone()));
+            }
+            let screen = self.invoke_binary(binary, args)?;
+            return Ok(screen.with_context(Arc::clone(&self.graph), filter_uid.to_string()));
+        }
+
+        Err(SimulatorError::NoBinary)
     }
 
     /// Performs a dynamic audit by invoking each keyword's Script Filter and
@@ -367,17 +375,27 @@ impl Simulator {
     ///
     /// Navigation signals indicate the item is meant to drill in to another
     /// Script Filter rather than being a leaf action:
-    /// - Non-empty `variables` on the item
+    /// - Non-empty `variables` on the item (unless the arg is a URL — leaf actions
+    ///   may carry variables for Alfred's use without being navigation items)
     /// - An `autocomplete` string set on the item
     fn is_navigation_item(item: &ScreenItem) -> bool {
-        // Check for variables
+        // Autocomplete is always a navigation signal
+        if item.autocomplete().is_some() {
+            return true;
+        }
+        // Variables are a navigation signal UNLESS the arg is a URL (leaf action)
         if let Some(vars) = item.raw().get("variables").and_then(|v| v.as_object()) {
             if !vars.is_empty() {
+                // If the arg looks like a URL, this is a leaf action with metadata
+                if let Some(arg) = item.arg() {
+                    if arg.starts_with("http://") || arg.starts_with("https://") {
+                        return false;
+                    }
+                }
                 return true;
             }
         }
-        // Check for autocomplete
-        item.autocomplete().is_some()
+        false
     }
 
     /// Internal: invoke a binary with args and Alfred env vars, return a Screen.
@@ -393,8 +411,8 @@ impl Simulator {
                 cache_dir.to_string_lossy().as_ref(),
             )
             .env("alfred_workflow_data", data_dir.to_string_lossy().as_ref())
-            .env("alfred_version", "5.5")
-            .env("alfred_version_build", "2300")
+            .env("alfred_version", DEFAULT_ALFRED_VERSION)
+            .env("alfred_version_build", DEFAULT_ALFRED_VERSION_BUILD)
             .output()
             .map_err(|e| SimulatorError::BinaryExec(e.to_string()))?;
 
@@ -412,6 +430,50 @@ impl Simulator {
         let screen =
             Screen::from_json(&json).map_err(|e| SimulatorError::OutputParse(e.to_string()))?;
         Ok(self.attach_context(screen))
+    }
+
+    /// Internal: invoke an inline shell script with `$1`/`{query}` substitution.
+    ///
+    /// Alfred expands `{query}` in inline scripts to the user's input and also
+    /// passes it as `$1`. We emulate both: replace `{query}` in the script text
+    /// and set `$1` via shell argument.
+    fn invoke_inline_script(&self, script: &str, args: &[&str]) -> Result<Screen, SimulatorError> {
+        let (cache_dir, data_dir) = self.resolve_dirs()?;
+        let query = args.join(" ");
+
+        // Substitute {query} in the script (Alfred's expansion)
+        let expanded = script.replace("{query}", &query);
+
+        let output = Command::new("/bin/sh")
+            .arg("-c")
+            .arg(&expanded)
+            .arg("--") // separator
+            .arg(&query) // becomes $1
+            .current_dir(&self.workflow_dir)
+            .env("alfred_workflow_bundleid", &self.bundleid)
+            .env("alfred_workflow_name", &self.workflow_name)
+            .env(
+                "alfred_workflow_cache",
+                cache_dir.to_string_lossy().as_ref(),
+            )
+            .env("alfred_workflow_data", data_dir.to_string_lossy().as_ref())
+            .env("alfred_version", DEFAULT_ALFRED_VERSION)
+            .env("alfred_version_build", DEFAULT_ALFRED_VERSION_BUILD)
+            .output()
+            .map_err(|e| SimulatorError::BinaryExec(e.to_string()))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(SimulatorError::BinaryExec(format!(
+                "inline script exit code {}: {}",
+                output.status.code().unwrap_or(-1),
+                stderr.trim()
+            )));
+        }
+
+        let json = String::from_utf8(output.stdout)
+            .map_err(|e| SimulatorError::OutputParse(e.to_string()))?;
+        Screen::from_json(&json).map_err(|e| SimulatorError::OutputParse(e.to_string()))
     }
 
     /// Resolves cache and data directories (using overrides or temp defaults).
@@ -479,8 +541,8 @@ impl ConfigProvider for SimulatorConfigProvider {
             workflow_bundleid: self.bundleid.clone(),
             workflow_cache: self.cache_dir.clone(),
             workflow_data: self.data_dir.clone(),
-            version: "5.5".to_string(),
-            version_build: "2300".to_string(),
+            version: DEFAULT_ALFRED_VERSION.to_string(),
+            version_build: DEFAULT_ALFRED_VERSION_BUILD.to_string(),
             workflow_name: self.workflow_name.clone(),
             workflow_version: None,
             preferences: None,
