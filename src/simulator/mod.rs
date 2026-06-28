@@ -87,5 +87,5 @@ mod screen;
 
 pub use action::ActionResult;
 pub use graph::{AuditDiagnostic, Connection, ObjectKind, ObjectNode, Severity, WorkflowGraph};
-pub use harness::{Simulator, SimulatorError};
+pub use harness::{DynamicAuditDiagnostic, Simulator, SimulatorError};
 pub use screen::{Screen, ScreenError, ScreenItem};

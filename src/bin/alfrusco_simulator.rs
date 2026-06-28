@@ -9,7 +9,7 @@ use std::process;
 
 use clap::{Parser, Subcommand};
 
-use alfrusco::simulator::{ActionResult, Simulator, WorkflowGraph};
+use alfrusco::simulator::{ActionResult, Severity, Simulator, WorkflowGraph};
 
 #[derive(Parser)]
 #[command(
@@ -24,9 +24,20 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Audit a workflow's info.plist for navigation defects.
+    ///
+    /// Without --binary: performs static graph analysis (dead-ends, dangling connections).
+    /// With --binary: also invokes each keyword dynamically and checks that navigation
+    /// items (those with variables or autocomplete) route to another Script Filter.
     Audit {
         /// Path to the workflow directory containing info.plist.
         dir: PathBuf,
+
+        /// Path to the pre-built workflow binary for dynamic audit.
+        /// When set, the audit invokes each keyword's Script Filter and checks
+        /// that navigation items route correctly (to another Script Filter, not
+        /// to Run Script / Open URL / dead-end).
+        #[arg(long)]
+        binary: Option<PathBuf>,
     },
     /// Invoke a workflow and display rendered items with action routing.
     Walk {
@@ -51,7 +62,7 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Audit { dir } => run_audit(&dir),
+        Commands::Audit { dir, binary } => run_audit(&dir, binary.as_deref()),
         Commands::Walk {
             dir,
             binary,
@@ -61,7 +72,7 @@ fn main() {
     }
 }
 
-fn run_audit(dir: &Path) {
+fn run_audit(dir: &Path, binary: Option<&Path>) {
     let plist_path = dir.join("info.plist");
     let graph = match WorkflowGraph::from_plist_file(&plist_path) {
         Ok(g) => g,
@@ -95,15 +106,67 @@ fn run_audit(dir: &Path) {
     let keyword_refs: Vec<&str> = keywords.iter().map(String::as_str).collect();
     let diagnostics = graph.audit_navigation(&keyword_refs);
 
-    if diagnostics.is_empty() {
-        println!("✓ No navigation defects found.");
-    } else {
-        println!("Found {} issue(s):", diagnostics.len());
+    let mut has_errors = false;
+
+    if !diagnostics.is_empty() {
+        println!("Static analysis: {} issue(s):", diagnostics.len());
         println!();
         for d in &diagnostics {
-            println!("  [{:?}] {}", d.severity, d.message);
+            let severity_str = match d.severity {
+                Severity::Error => "Error",
+                Severity::Warning => "Warning",
+                Severity::Info => "Info",
+            };
+            println!("  [{severity_str}] {}", d.message);
+            if d.severity >= Severity::Error {
+                has_errors = true;
+            }
         }
+        println!();
+    }
+
+    // Dynamic audit: invoke each keyword and check nav item routing
+    if let Some(binary_path) = binary {
+        let sim = match Simulator::for_workflow_dir(dir) {
+            Ok(s) => s.binary(binary_path),
+            Err(e) => {
+                eprintln!("ERROR: {e}");
+                process::exit(1);
+            }
+        };
+
+        match sim.dynamic_audit() {
+            Ok(dyn_diagnostics) => {
+                if !dyn_diagnostics.is_empty() {
+                    println!("Dynamic analysis: {} issue(s):", dyn_diagnostics.len());
+                    println!();
+                    for d in &dyn_diagnostics {
+                        let severity_str = match d.severity {
+                            Severity::Error => "Error",
+                            Severity::Warning => "Warning",
+                            Severity::Info => "Info",
+                        };
+                        println!("  [{severity_str}] {}", d.message);
+                        if d.severity >= Severity::Error {
+                            has_errors = true;
+                        }
+                    }
+                    println!();
+                }
+            }
+            Err(e) => {
+                eprintln!("ERROR: dynamic audit failed: {e}");
+                process::exit(1);
+            }
+        }
+    }
+
+    if has_errors {
         process::exit(1);
+    } else if diagnostics.is_empty() && binary.is_none() {
+        println!("✓ No navigation defects found.");
+    } else if diagnostics.is_empty() {
+        println!("✓ No navigation defects found (static + dynamic).");
     }
 }
 

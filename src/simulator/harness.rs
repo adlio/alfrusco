@@ -9,7 +9,9 @@ use crate::error::WorkflowError;
 use crate::workflow::{finalize_workflow, setup_workflow};
 use crate::Runnable;
 
-use super::screen::Screen;
+use super::action::ActionResult;
+use super::graph::Severity;
+use super::screen::{Screen, ScreenItem};
 use super::{ObjectKind, WorkflowGraph};
 
 /// A headless Alfred workflow simulator.
@@ -207,9 +209,182 @@ impl Simulator {
             return Err(SimulatorError::BinaryNotFound(binary));
         }
 
+        self.invoke_binary(&binary, args)
+    }
+
+    /// Invokes a specific Script Filter by its UID, using that filter's own
+    /// `scriptfile` or `script` configuration from `info.plist`.
+    ///
+    /// This is the faithful invocation mode: it runs the exact command Alfred
+    /// would run for this Script Filter, with the query passed as arguments.
+    /// The binary is resolved as `<workflow_dir>/<scriptfile>` when a `scriptfile`
+    /// is configured, or falls back to the binary set via [`Simulator::binary`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The UID does not correspond to a Script Filter in the graph
+    /// - No `scriptfile` is configured and no binary was set
+    /// - The resolved binary does not exist
+    /// - The binary fails to execute
+    pub fn invoke_script_filter(
+        &self,
+        filter_uid: &str,
+        args: &[&str],
+    ) -> Result<Screen, SimulatorError> {
+        let node = self.graph.objects().get(filter_uid).ok_or_else(|| {
+            SimulatorError::OutputParse(format!("no object with UID '{filter_uid}'"))
+        })?;
+
+        // Determine binary: prefer scriptfile from plist if it exists at the resolved path,
+        // otherwise fall back to explicit binary
+        let binary = if let Some(script_file) = node.script_file() {
+            let resolved = self.workflow_dir.join(script_file);
+            if resolved.is_file() {
+                resolved
+            } else if let Some(b) = &self.binary {
+                b.clone()
+            } else {
+                return Err(SimulatorError::BinaryNotFound(resolved));
+            }
+        } else if let Some(binary) = &self.binary {
+            binary.clone()
+        } else {
+            return Err(SimulatorError::NoBinary);
+        };
+
+        if !binary.is_file() {
+            return Err(SimulatorError::BinaryNotFound(binary));
+        }
+
+        // Use this filter as the source for action routing
+        let screen = self.invoke_binary(&binary, args)?;
+        Ok(screen.with_context(Arc::clone(&self.graph), filter_uid.to_string()))
+    }
+
+    /// Performs a dynamic audit by invoking each keyword's Script Filter and
+    /// checking that navigation items route correctly.
+    ///
+    /// A "navigation item" is one carrying a navigation signal:
+    /// - Non-empty `variables` (typically used for drill-in state)
+    /// - An `autocomplete` string (tab-completion loopback)
+    ///
+    /// For each such item, the audit verifies that its action route reaches
+    /// another Script Filter (`DrilledIn` or `TypedAutocomplete`). If a nav item
+    /// routes to `RanScript`, `OpenedUrl`, or `DeadEnd`, that's an error.
+    ///
+    /// Leaf items (no variables, no autocomplete) are NOT flagged even if they
+    /// route to a Run Script or Open URL — that's expected behavior.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow invocation fails entirely. Individual
+    /// misrouted items are reported as [`DynamicAuditDiagnostic`] entries.
+    pub fn dynamic_audit(&self) -> Result<Vec<DynamicAuditDiagnostic>, SimulatorError> {
+        let mut diagnostics = Vec::new();
+
+        // Find all keyword-bearing Script Filters
+        let filters: Vec<(&str, &str)> = self
+            .graph
+            .objects()
+            .values()
+            .filter(|n| n.kind == ObjectKind::ScriptFilter && n.keyword.is_some())
+            .map(|n| (n.uid.as_str(), n.keyword.as_deref().unwrap_or("")))
+            .collect();
+
+        for (uid, keyword) in filters {
+            // Invoke the Script Filter with no query (top-level)
+            let screen = match self.invoke_script_filter(uid, &[]) {
+                Ok(s) => s,
+                Err(e) => {
+                    diagnostics.push(DynamicAuditDiagnostic {
+                        severity: Severity::Warning,
+                        message: format!("Could not invoke Script Filter '{keyword}' ({uid}): {e}"),
+                        keyword: keyword.to_string(),
+                        item_title: None,
+                    });
+                    continue;
+                }
+            };
+
+            // Check each item for navigation signals
+            for (i, item) in screen.items().iter().enumerate() {
+                if !Self::is_navigation_item(item) {
+                    continue;
+                }
+
+                // This item has navigation signals — check its route
+                if let Some(action) = screen.action(i) {
+                    match &action {
+                        ActionResult::DrilledIn { .. } | ActionResult::TypedAutocomplete { .. } => {
+                            // Correct: nav item routes to another Script Filter
+                        }
+                        ActionResult::RanScript { target_uid } => {
+                            diagnostics.push(DynamicAuditDiagnostic {
+                                severity: Severity::Error,
+                                message: format!(
+                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
+                                     routes to Run Script ({target_uid}) instead of another Script Filter",
+                                    item.title()
+                                ),
+                                keyword: keyword.to_string(),
+                                item_title: Some(item.title().to_string()),
+                            });
+                        }
+                        ActionResult::OpenedUrl { url_template } => {
+                            diagnostics.push(DynamicAuditDiagnostic {
+                                severity: Severity::Error,
+                                message: format!(
+                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
+                                     routes to Open URL ({url_template}) instead of another Script Filter",
+                                    item.title()
+                                ),
+                                keyword: keyword.to_string(),
+                                item_title: Some(item.title().to_string()),
+                            });
+                        }
+                        ActionResult::DeadEnd => {
+                            diagnostics.push(DynamicAuditDiagnostic {
+                                severity: Severity::Error,
+                                message: format!(
+                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
+                                     has no route (dead-end)",
+                                    item.title()
+                                ),
+                                keyword: keyword.to_string(),
+                                item_title: Some(item.title().to_string()),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(diagnostics)
+    }
+
+    /// Returns `true` if a screen item carries navigation signals.
+    ///
+    /// Navigation signals indicate the item is meant to drill in to another
+    /// Script Filter rather than being a leaf action:
+    /// - Non-empty `variables` on the item
+    /// - An `autocomplete` string set on the item
+    fn is_navigation_item(item: &ScreenItem) -> bool {
+        // Check for variables
+        if let Some(vars) = item.raw().get("variables").and_then(|v| v.as_object()) {
+            if !vars.is_empty() {
+                return true;
+            }
+        }
+        // Check for autocomplete
+        item.autocomplete().is_some()
+    }
+
+    /// Internal: invoke a binary with args and Alfred env vars, return a Screen.
+    fn invoke_binary(&self, binary: &Path, args: &[&str]) -> Result<Screen, SimulatorError> {
         let (cache_dir, data_dir) = self.resolve_dirs()?;
 
-        let output = Command::new(&binary)
+        let output = Command::new(binary)
             .args(args)
             .env("alfred_workflow_bundleid", &self.bundleid)
             .env("alfred_workflow_name", &self.workflow_name)
@@ -366,4 +541,17 @@ pub enum SimulatorError {
     /// An I/O error occurred.
     #[error("I/O error: {0}")]
     Io(String),
+}
+
+/// A diagnostic from dynamic audit (invoking the workflow and inspecting item routing).
+#[derive(Debug, Clone)]
+pub struct DynamicAuditDiagnostic {
+    /// Severity of this finding.
+    pub severity: Severity,
+    /// Human-readable description of the issue.
+    pub message: String,
+    /// The keyword of the Script Filter that produced the item.
+    pub keyword: String,
+    /// The title of the misrouted item, if applicable.
+    pub item_title: Option<String>,
 }

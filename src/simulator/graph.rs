@@ -61,6 +61,22 @@ impl ObjectNode {
     pub fn config_value(&self, key: &str) -> Option<&str> {
         self.config_strings.get(key).map(String::as_str)
     }
+
+    /// Returns the script file name configured on this Script Filter, if any.
+    ///
+    /// This is the `scriptfile` field from the Alfred `info.plist`, representing
+    /// the binary that Alfred executes relative to the workflow directory.
+    pub fn script_file(&self) -> Option<&str> {
+        self.config_value("scriptfile").filter(|s| !s.is_empty())
+    }
+
+    /// Returns the inline script configured on this Script Filter, if any.
+    ///
+    /// This is the `script` field from the Alfred `info.plist`, containing
+    /// a shell command that Alfred executes directly.
+    pub fn script(&self) -> Option<&str> {
+        self.config_value("script").filter(|s| !s.is_empty())
+    }
 }
 
 /// A directed edge between two objects, optionally gated by a modifier key combination.
