@@ -64,7 +64,11 @@ impl Screen {
     }
 
     /// Creates a screen with graph context for action routing.
-    pub(crate) fn with_context(mut self, graph: Arc<WorkflowGraph>, source_uid: String) -> Self {
+    ///
+    /// This is useful for testing action resolution without a full
+    /// [`Simulator`](super::Simulator) setup — parse JSON via [`Screen::from_json`],
+    /// then attach a graph.
+    pub fn with_context(mut self, graph: Arc<WorkflowGraph>, source_uid: String) -> Self {
         self.context = Some(ActionContext { graph, source_uid });
         self
     }
@@ -143,11 +147,16 @@ impl Screen {
     pub fn action_with_modifiers(&self, index: usize, modifiers: u64) -> Option<ActionResult> {
         let ctx = self.context.as_ref()?;
         let item = &self.items[index];
+        let item_context = super::action::ItemContext {
+            arg: item.arg(),
+            variables: item.raw().get("variables"),
+        };
         Some(resolve_action(
             &ctx.graph,
             &ctx.source_uid,
             item.is_valid(),
             item.autocomplete(),
+            &item_context,
             modifiers,
         ))
     }

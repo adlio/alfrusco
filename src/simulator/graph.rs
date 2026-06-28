@@ -52,6 +52,8 @@ pub struct ObjectNode {
     pub keyword: Option<String>,
     /// The display title of this object.
     pub title: Option<String>,
+    /// Conditions for Conditional objects (empty for non-conditionals).
+    pub conditions: Vec<Condition>,
     /// Raw config key-value pairs (string values only).
     config_strings: HashMap<String, String>,
 }
@@ -88,6 +90,188 @@ pub struct Connection {
     pub destination_uid: String,
     /// The modifier bitmask (0 = no modifier / default connection).
     pub modifiers: u64,
+    /// The output port UID on the source (used by Conditional nodes to distinguish branches).
+    ///
+    /// For conditionals, each condition's `uid` identifies one output port, and the
+    /// else branch typically has no `sourceoutputuid` or a well-known sentinel.
+    pub source_output_uid: Option<String>,
+}
+
+/// A single condition branch inside a Conditional object.
+///
+/// Alfred evaluates conditions in order; the first match determines which output
+/// port the connection follows. If no condition matches, the else branch is taken.
+#[derive(Debug, Clone)]
+pub struct Condition {
+    /// The UID of this condition's output port (matches [`Connection::source_output_uid`]).
+    pub uid: Option<String>,
+    /// What to test — typically `{query}` (the item's arg) or `{var:name}`.
+    pub input_string: String,
+    /// The match mode (see [`MatchMode`]).
+    pub match_mode: MatchMode,
+    /// The pattern to match against.
+    pub match_string: String,
+    /// Whether matching is case-sensitive.
+    pub match_case_sensitive: bool,
+}
+
+/// Alfred Conditional match modes.
+///
+/// These numeric values correspond to the `matchmode` integer in Alfred's
+/// `info.plist` conditional configuration.
+///
+/// # Match mode table
+///
+/// | Value | Mode | Description |
+/// |-------|------|-------------|
+/// | 0 | Is | Exact equality (or "is empty" when `matchstring` is empty) |
+/// | 1 | IsNot | Not equal |
+/// | 2 | Contains | Substring match |
+/// | 3 | DoesNotContain | No substring match |
+/// | 4 | StartsWith | Prefix match |
+/// | 5 | EndsWith | Suffix match |
+/// | 6 | MatchesRegex | Regular expression match |
+///
+/// # Example
+///
+/// ```
+/// use alfrusco::simulator::MatchMode;
+///
+/// assert_eq!(MatchMode::from_integer(0), MatchMode::Is);
+/// assert_eq!(MatchMode::from_integer(4), MatchMode::StartsWith);
+/// assert_eq!(MatchMode::from_integer(99), MatchMode::Unknown(99));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchMode {
+    /// Exact equality (matchmode 0). When `matchstring` is empty, tests "is empty".
+    Is,
+    /// Not equal (matchmode 1). When `matchstring` is empty, tests "is not empty".
+    IsNot,
+    /// Substring match (matchmode 2).
+    Contains,
+    /// No substring match (matchmode 3).
+    DoesNotContain,
+    /// Prefix match (matchmode 4).
+    StartsWith,
+    /// Suffix match (matchmode 5).
+    EndsWith,
+    /// Regular expression match (matchmode 6).
+    MatchesRegex,
+    /// An unrecognized matchmode value.
+    Unknown(u64),
+}
+
+impl MatchMode {
+    /// Parses a matchmode integer from an Alfred `info.plist`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use alfrusco::simulator::MatchMode;
+    ///
+    /// assert_eq!(MatchMode::from_integer(2), MatchMode::Contains);
+    /// ```
+    pub fn from_integer(n: u64) -> Self {
+        match n {
+            0 => Self::Is,
+            1 => Self::IsNot,
+            2 => Self::Contains,
+            3 => Self::DoesNotContain,
+            4 => Self::StartsWith,
+            5 => Self::EndsWith,
+            6 => Self::MatchesRegex,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Evaluates this match mode against an input and pattern.
+    ///
+    /// When `case_sensitive` is false, both input and pattern are lowercased
+    /// before comparison (except for regex, which uses the `(?i)` flag).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use alfrusco::simulator::MatchMode;
+    ///
+    /// assert!(MatchMode::Is.evaluate("hello", "hello", false));
+    /// assert!(!MatchMode::Is.evaluate("hello", "world", false));
+    /// assert!(MatchMode::Is.evaluate("Hello", "hello", false));
+    /// assert!(!MatchMode::Is.evaluate("Hello", "hello", true));
+    /// assert!(MatchMode::Contains.evaluate("hello world", "world", false));
+    /// assert!(MatchMode::StartsWith.evaluate("http://x.com", "http", false));
+    /// assert!(MatchMode::EndsWith.evaluate("file.txt", ".txt", false));
+    /// ```
+    pub fn evaluate(&self, input: &str, pattern: &str, case_sensitive: bool) -> bool {
+        match self {
+            Self::Is => {
+                // Empty pattern means "is empty" check
+                if pattern.is_empty() {
+                    return input.is_empty();
+                }
+                if case_sensitive {
+                    input == pattern
+                } else {
+                    input.eq_ignore_ascii_case(pattern)
+                }
+            }
+            Self::IsNot => {
+                if pattern.is_empty() {
+                    return !input.is_empty();
+                }
+                if case_sensitive {
+                    input != pattern
+                } else {
+                    !input.eq_ignore_ascii_case(pattern)
+                }
+            }
+            Self::Contains => {
+                if case_sensitive {
+                    input.contains(pattern)
+                } else {
+                    input
+                        .to_ascii_lowercase()
+                        .contains(&pattern.to_ascii_lowercase())
+                }
+            }
+            Self::DoesNotContain => {
+                if case_sensitive {
+                    !input.contains(pattern)
+                } else {
+                    !input
+                        .to_ascii_lowercase()
+                        .contains(&pattern.to_ascii_lowercase())
+                }
+            }
+            Self::StartsWith => {
+                if case_sensitive {
+                    input.starts_with(pattern)
+                } else {
+                    input
+                        .to_ascii_lowercase()
+                        .starts_with(&pattern.to_ascii_lowercase())
+                }
+            }
+            Self::EndsWith => {
+                if case_sensitive {
+                    input.ends_with(pattern)
+                } else {
+                    input
+                        .to_ascii_lowercase()
+                        .ends_with(&pattern.to_ascii_lowercase())
+                }
+            }
+            Self::MatchesRegex => {
+                let pattern_str = if case_sensitive {
+                    pattern.to_string()
+                } else {
+                    format!("(?i){pattern}")
+                };
+                regex::Regex::new(&pattern_str).is_ok_and(|re| re.is_match(input))
+            }
+            Self::Unknown(_) => false,
+        }
+    }
 }
 
 /// Severity level for audit diagnostics.
@@ -183,10 +367,15 @@ impl WorkflowGraph {
                                 .get("modifiers")
                                 .and_then(|v| v.as_unsigned_integer())
                                 .unwrap_or(0);
+                            let source_output_uid = dest_dict
+                                .get("sourceoutputuid")
+                                .and_then(|v| v.as_string())
+                                .map(String::from);
                             connections.push(Connection {
                                 source_uid: source_uid.clone(),
                                 destination_uid,
                                 modifiers,
+                                source_output_uid,
                             });
                         }
                     }
@@ -218,6 +407,13 @@ impl WorkflowGraph {
             .and_then(|v| v.as_string())
             .map(String::from);
 
+        // Parse conditions for Conditional objects
+        let conditions = if kind == ObjectKind::Conditional {
+            Self::parse_conditions(config)
+        } else {
+            Vec::new()
+        };
+
         // Collect all string-valued config entries
         let config_strings = config
             .map(|c| {
@@ -232,8 +428,53 @@ impl WorkflowGraph {
             kind,
             keyword,
             title,
+            conditions,
             config_strings,
         })
+    }
+
+    /// Parses the conditions array from a Conditional object's config.
+    fn parse_conditions(config: Option<&plist::Dictionary>) -> Vec<Condition> {
+        let Some(config) = config else {
+            return Vec::new();
+        };
+        let Some(conditions_array) = config.get("conditions").and_then(|v| v.as_array()) else {
+            return Vec::new();
+        };
+
+        conditions_array
+            .iter()
+            .filter_map(|v| {
+                let d = v.as_dictionary()?;
+                let input_string = d
+                    .get("inputstring")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("{query}")
+                    .to_string();
+                let match_mode = MatchMode::from_integer(
+                    d.get("matchmode")
+                        .and_then(|v| v.as_unsigned_integer())
+                        .unwrap_or(0),
+                );
+                let match_string = d
+                    .get("matchstring")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("")
+                    .to_string();
+                let match_case_sensitive = d
+                    .get("matchcasesensitive")
+                    .and_then(|v| v.as_boolean())
+                    .unwrap_or(false);
+                let uid = d.get("uid").and_then(|v| v.as_string()).map(String::from);
+                Some(Condition {
+                    uid,
+                    input_string,
+                    match_mode,
+                    match_string,
+                    match_case_sensitive,
+                })
+            })
+            .collect()
     }
 
     /// Returns all objects in the graph.
