@@ -277,17 +277,18 @@ impl Simulator {
     /// - Non-empty `variables` (typically used for drill-in state)
     /// - An `autocomplete` string (tab-completion loopback)
     ///
-    /// For each such item, the audit verifies that its action route reaches
-    /// another Script Filter (`DrilledIn` or `TypedAutocomplete`). If a nav item
-    /// routes to `RanScript`, `OpenedUrl`, or `DeadEnd`, that's an error.
-    ///
-    /// Leaf items (no variables, no autocomplete) are NOT flagged even if they
-    /// route to a Run Script or Open URL — that's expected behavior.
+    /// The audit classifies each actioned item's route and ERRORs **only** on
+    /// dead-ends (the matched branch output is unconnected/dangling). Legitimate
+    /// terminal outcomes are never flagged:
+    /// - `DrilledIn` — reached another Script Filter (directly or via External Trigger)
+    /// - `TypedAutocomplete` — autocomplete loopback
+    /// - `RanScript` — act-and-exit via Run Script (intentional)
+    /// - `OpenedUrl` — act-and-exit via Open URL (intentional)
     ///
     /// # Errors
     ///
     /// Returns an error if workflow invocation fails entirely. Individual
-    /// misrouted items are reported as [`DynamicAuditDiagnostic`] entries.
+    /// dead-end items are reported as [`DynamicAuditDiagnostic`] entries.
     pub fn dynamic_audit(&self) -> Result<Vec<DynamicAuditDiagnostic>, SimulatorError> {
         let mut diagnostics = Vec::new();
 
@@ -315,55 +316,25 @@ impl Simulator {
                 }
             };
 
-            // Check each item for navigation signals
+            // Check each item for dead-ends
             for (i, item) in screen.items().iter().enumerate() {
                 if !Self::is_navigation_item(item) {
                     continue;
                 }
 
-                // This item has navigation signals — check its route
-                if let Some(action) = screen.action(i) {
-                    match &action {
-                        ActionResult::DrilledIn { .. } | ActionResult::TypedAutocomplete { .. } => {
-                            // Correct: nav item routes to another Script Filter
-                        }
-                        ActionResult::RanScript { target_uid } => {
-                            diagnostics.push(DynamicAuditDiagnostic {
-                                severity: Severity::Error,
-                                message: format!(
-                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
-                                     routes to Run Script ({target_uid}) instead of another Script Filter",
-                                    item.title()
-                                ),
-                                keyword: keyword.to_string(),
-                                item_title: Some(item.title().to_string()),
-                            });
-                        }
-                        ActionResult::OpenedUrl { url_template } => {
-                            diagnostics.push(DynamicAuditDiagnostic {
-                                severity: Severity::Error,
-                                message: format!(
-                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
-                                     routes to Open URL ({url_template}) instead of another Script Filter",
-                                    item.title()
-                                ),
-                                keyword: keyword.to_string(),
-                                item_title: Some(item.title().to_string()),
-                            });
-                        }
-                        ActionResult::DeadEnd => {
-                            diagnostics.push(DynamicAuditDiagnostic {
-                                severity: Severity::Error,
-                                message: format!(
-                                    "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
-                                     has no route (dead-end)",
-                                    item.title()
-                                ),
-                                keyword: keyword.to_string(),
-                                item_title: Some(item.title().to_string()),
-                            });
-                        }
-                    }
+                // This item has navigation signals — only flag dead-ends
+                if screen.action(i) == Some(ActionResult::DeadEnd) {
+                    diagnostics.push(DynamicAuditDiagnostic {
+                        severity: Severity::Error,
+                        message: format!(
+                            "Navigation item '{}' from Script Filter '{keyword}' ({uid}) \
+                             has no route (dead-end: matched branch output is \
+                             unconnected or dangling)",
+                            item.title()
+                        ),
+                        keyword: keyword.to_string(),
+                        item_title: Some(item.title().to_string()),
+                    });
                 }
             }
         }

@@ -1,4 +1,7 @@
-//! Tests for S8: dynamic, navigation-aware audit + faithful keyword invocation.
+//! Tests for dynamic audit: dead-end-only error semantics (R3).
+//!
+//! The dynamic audit ERRORs ONLY on `DeadEnd` (dangling/unconnected matched branch).
+//! Legitimate terminals (RanScript, OpenedUrl) are never flagged.
 
 use alfrusco::simulator::{Severity, Simulator};
 
@@ -33,9 +36,10 @@ fn dynamic_audit_good_menu_is_clean() {
 }
 
 #[test]
-fn dynamic_audit_misrouted_detects_nav_to_run_script() {
-    // The misrouted fixture has SF-MAIN → RUN-SCRIPT, so nav items (which carry
-    // variables + autocomplete) should be flagged as misrouted.
+fn dynamic_audit_act_and_exit_not_flagged() {
+    // The "misrouted" fixture connects SF-MAIN → RUN-SCRIPT directly.
+    // Navigation items routing to RanScript is a legitimate act-and-exit pattern.
+    // Under the faithful semantics, this is NOT an error.
     let sim = Simulator::for_workflow_dir("tests/fixtures/menu_misrouted_workflow")
         .unwrap()
         .binary(menu_binary());
@@ -47,23 +51,41 @@ fn dynamic_audit_misrouted_detects_nav_to_run_script() {
         .collect();
 
     assert!(
+        errors.is_empty(),
+        "act-and-exit (nav→RanScript) should NOT be flagged, got: {errors:#?}"
+    );
+}
+
+#[test]
+fn dynamic_audit_dangling_loopback_is_dead_end() {
+    // The dangling fixture has a conditional whose loopback branch points to a
+    // non-existent UID. Items with arg="loopback" (matching the condition) hit
+    // a dead-end — that IS the one real error.
+    let sim = Simulator::for_workflow_dir("tests/fixtures/menu_dangling_workflow")
+        .unwrap()
+        .binary(menu_binary());
+
+    let diagnostics = sim.dynamic_audit().unwrap();
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.severity >= Severity::Error)
+        .collect();
+
+    assert!(
         !errors.is_empty(),
-        "expected errors for misrouted nav items, got none"
+        "expected dead-end errors for dangling loopback, got none"
     );
 
-    // Verify the error mentions routing to Run Script
-    let has_run_script_error = errors.iter().any(|d| d.message.contains("Run Script"));
+    // Verify the error mentions dead-end
+    let has_dead_end_error = errors.iter().any(|d| d.message.contains("dead-end"));
     assert!(
-        has_run_script_error,
-        "expected an error about routing to Run Script, got: {errors:#?}"
+        has_dead_end_error,
+        "expected an error about dead-end, got: {errors:#?}"
     );
 }
 
 #[test]
 fn invoke_script_filter_uses_scriptfile() {
-    // In the good menu workflow, SF-MAIN-001 has scriptfile "menu".
-    // The file doesn't exist at examples/menu_workflow/menu, so it should
-    // fall back to the explicit binary.
     let sim = Simulator::for_workflow_dir("examples/menu_workflow")
         .unwrap()
         .binary(menu_binary());

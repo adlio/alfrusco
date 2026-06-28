@@ -9,7 +9,7 @@ Evidence-required: check a box ONLY after pasting the milestone's behavioural ev
       (matchstring + matchmode + matchcasesensitive) against the actioned item's `arg`/`{query}`;
       follow the matched branch, else the `else` output. Document the matchmode mapping table.
       Evidence: arg→branch routing unit tests on a generic conditional fixture.
-- [ ] **R2 — External Trigger drill-in resolution.** `callexternaltrigger` → matching
+- [x] **R2 — External Trigger drill-in resolution.** `callexternaltrigger` → matching
       `trigger.external` input (by trigger id) → Script Filter == drill-in. Generic
       `menu_external_trigger` fixture. Evidence: reachability/action report `DrilledIn`; audit clean.
 - [ ] **R3 — Terminal classification + dead-end-only error.** DrilledIn / OpenedUrl / RanScript /
@@ -84,8 +84,50 @@ test result: ok. 16 passed; 0 failed; 0 ignored
 
 ### `make ci` status: ✅ GREEN (303 tests pass)
 
+## R2 Evidence
+
+### External Trigger fixture graph
+
+```
+SF-MAIN-001 → COND-001 →(loopback)→ CALL-TRIGGER-001 [callexternaltrigger, triggerid="sub-menu-trigger"]
+                                          ↓ (resolved by trigger ID)
+                                     EXT-TRIGGER-001 [trigger.external, triggerid="sub-menu-trigger"]
+                                          ↓
+                                     SF-SUB-001 → ACTION-URL-001
+                    →(else)→ ACTION-URL-001
+```
+
+### Test output (8 external trigger tests, all pass)
+
+```
+running 8 tests
+test audit_navigation_clean_for_external_trigger_workflow ... ok
+test external_trigger_drill_in_reports_drilled_in ... ok
+test external_trigger_else_branch_opens_url ... ok
+test external_trigger_uid_resolution ... ok
+test parses_call_external_trigger_node ... ok
+test parses_external_trigger_node ... ok
+test reachable_kinds_traverses_external_trigger ... ok
+test reaches_script_filter_via_external_trigger ... ok
+test result: ok. 8 passed; 0 failed; 0 ignored
+```
+
+### Key routing tests proving External Trigger drill-in
+
+- `arg="loopback"` → COND-001 condition[0] matches → CALL-TRIGGER-001 → resolves triggerid "sub-menu-trigger" → EXT-TRIGGER-001 → SF-SUB-001 → **DrilledIn**
+- `arg="https://example.com"` → COND-001 no match → else branch → ACTION-URL-001 → **OpenedUrl**
+- `reachable_kinds("SF-MAIN-001")` includes `ScriptFilter` (via external trigger chain) ✅
+- `reaches_script_filter("SF-MAIN-001")` = true ✅
+- `audit_navigation(&[])` returns 0 errors ✅
+
+### `make ci` status: ✅ GREEN (311 tests pass)
+
 ## Iteration log
 
 - 2026-06-28: R1 implemented — MatchMode enum, Condition struct, sourceoutputuid parsing,
   conditional evaluation in resolve_action. 16 new tests, all pass. `make ci` green (303 tests).
   IP-clean grep empty. Commit: `74600e8`.
+- 2026-06-28: R2 implemented — CallExternalTrigger + ExternalTrigger ObjectKind variants,
+  external_trigger_uid() lookup, resolve_external_trigger() in action routing,
+  reachable_kinds() follows trigger boundaries. Generic fixture + 8 new tests, all pass.
+  `make ci` green (311 tests). IP-clean grep empty. Commit: `f600031`.
