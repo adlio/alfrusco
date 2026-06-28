@@ -214,12 +214,17 @@ fn resolve_from_node(
             // Evaluate conditions to determine which branch to follow
             resolve_conditional(graph, dest_node, dest_uid, item_context, modifiers, visited)
         }
-        // Clipboard, other — treat as RanScript (it's an action endpoint)
-        ObjectKind::Clipboard | ObjectKind::Other(_) | ObjectKind::Keyword => {
-            ActionResult::RanScript {
-                target_uid: dest_uid.clone(),
-            }
+        ObjectKind::CallExternalTrigger => {
+            // Resolve to the matching External Trigger input and continue traversal
+            resolve_external_trigger(graph, dest_node, item_context, modifiers, visited)
         }
+        // Clipboard, ExternalTrigger (as direct destination), other — treat as action endpoint
+        ObjectKind::Clipboard
+        | ObjectKind::Other(_)
+        | ObjectKind::Keyword
+        | ObjectKind::ExternalTrigger => ActionResult::RanScript {
+            target_uid: dest_uid.clone(),
+        },
     }
 }
 
@@ -331,12 +336,42 @@ fn classify_or_continue(
         ObjectKind::Conditional => {
             resolve_conditional(graph, dest_node, dest_uid, item_context, modifiers, visited)
         }
-        ObjectKind::Clipboard | ObjectKind::Other(_) | ObjectKind::Keyword => {
-            ActionResult::RanScript {
-                target_uid: dest_uid.to_string(),
-            }
+        ObjectKind::CallExternalTrigger => {
+            // Resolve to the matching External Trigger input and continue traversal
+            resolve_external_trigger(graph, dest_node, item_context, modifiers, visited)
         }
+        ObjectKind::Clipboard
+        | ObjectKind::Other(_)
+        | ObjectKind::Keyword
+        | ObjectKind::ExternalTrigger => ActionResult::RanScript {
+            target_uid: dest_uid.to_string(),
+        },
     }
+}
+
+/// Resolves a `CallExternalTrigger` node by finding the matching External Trigger
+/// input (by trigger ID) and continuing traversal from its outgoing connections.
+///
+/// This implements the `item → callexternaltrigger → external-trigger-input → …`
+/// chain that Alfred uses for indirect navigation (e.g. drill-in via triggers).
+fn resolve_external_trigger(
+    graph: &WorkflowGraph,
+    call_node: &super::graph::ObjectNode,
+    item_context: &ItemContext<'_>,
+    modifiers: u64,
+    visited: &mut Vec<String>,
+) -> ActionResult {
+    let Some(trigger_id) = call_node.config_value("triggerid") else {
+        return ActionResult::DeadEnd;
+    };
+
+    let Some(trigger_uid) = graph.external_trigger_uid(trigger_id) else {
+        // No matching trigger input found → dead-end
+        return ActionResult::DeadEnd;
+    };
+
+    // Continue traversal from the External Trigger input's outgoing connections
+    resolve_from_node(graph, trigger_uid, item_context, modifiers, visited)
 }
 
 /// Evaluates conditions in order and returns the UID of the first matching condition.

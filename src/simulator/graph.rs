@@ -22,6 +22,16 @@ pub enum ObjectKind {
     Conditional,
     /// A clipboard output (`alfred.workflow.output.clipboard`).
     Clipboard,
+    /// A Call External Trigger output (`alfred.workflow.output.callexternaltrigger`).
+    ///
+    /// Routes to a matching External Trigger input by trigger ID, enabling
+    /// indirect drill-in navigation.
+    CallExternalTrigger,
+    /// An External Trigger input (`alfred.workflow.trigger.external`).
+    ///
+    /// Receives calls from [`CallExternalTrigger`](Self::CallExternalTrigger) nodes
+    /// and continues traversal along its outgoing connections.
+    ExternalTrigger,
     /// Any other Alfred object type.
     Other(String),
 }
@@ -36,6 +46,8 @@ impl ObjectKind {
             "alfred.workflow.action.script" => Self::RunScript,
             "alfred.workflow.utility.conditional" => Self::Conditional,
             "alfred.workflow.output.clipboard" => Self::Clipboard,
+            "alfred.workflow.output.callexternaltrigger" => Self::CallExternalTrigger,
+            "alfred.workflow.trigger.external" => Self::ExternalTrigger,
             other => Self::Other(other.to_string()),
         }
     }
@@ -512,7 +524,9 @@ impl WorkflowGraph {
     /// Returns the set of [`ObjectKind`]s reachable from the given UID via any connections.
     ///
     /// Performs a breadth-first traversal following all outgoing connections (regardless
-    /// of modifier). The starting node itself is not included.
+    /// of modifier). Call External Trigger nodes are resolved to their matching
+    /// External Trigger inputs, allowing the traversal to cross trigger boundaries.
+    /// The starting node itself is not included.
     pub fn reachable_kinds(&self, uid: &str) -> HashSet<ObjectKind> {
         let mut visited = HashSet::new();
         let mut queue = VecDeque::new();
@@ -529,6 +543,18 @@ impl WorkflowGraph {
         while let Some(current) = queue.pop_front() {
             if let Some(node) = self.objects.get(&current) {
                 kinds.insert(node.kind.clone());
+
+                // If this is a CallExternalTrigger, resolve to the matching trigger input
+                if node.kind == ObjectKind::CallExternalTrigger {
+                    if let Some(trigger_id) = node.config_value("triggerid") {
+                        if let Some(trigger_uid) = self.external_trigger_uid(trigger_id) {
+                            if !visited.contains(trigger_uid) {
+                                visited.insert(trigger_uid.to_string());
+                                queue.push_back(trigger_uid.to_string());
+                            }
+                        }
+                    }
+                }
             }
             for conn in &self.connections {
                 if conn.source_uid == current && !visited.contains(&conn.destination_uid) {
@@ -645,6 +671,34 @@ impl WorkflowGraph {
         }
 
         diagnostics
+    }
+
+    /// Finds the External Trigger input node that matches a given trigger ID.
+    ///
+    /// Alfred's `callexternaltrigger` output nodes reference a trigger by ID.
+    /// This method locates the corresponding `trigger.external` input node so
+    /// traversal can continue along its outgoing connections.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use alfrusco::simulator::WorkflowGraph;
+    /// let graph = WorkflowGraph::from_plist_file("workflow/info.plist").unwrap();
+    /// if let Some(trigger_uid) = graph.external_trigger_uid("my-trigger") {
+    ///     // Continue traversal from this trigger's outgoing connections
+    ///     let conns = graph.outgoing_connections(trigger_uid, Some(0));
+    /// }
+    /// ```
+    pub fn external_trigger_uid(&self, trigger_id: &str) -> Option<&str> {
+        self.objects.values().find_map(|node| {
+            if node.kind == ObjectKind::ExternalTrigger
+                && node.config_value("triggerid") == Some(trigger_id)
+            {
+                Some(node.uid.as_str())
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns the outgoing connections from the given UID, optionally filtered
