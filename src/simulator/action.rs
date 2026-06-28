@@ -14,27 +14,25 @@ use super::graph::{ObjectKind, WorkflowGraph};
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```
 /// use alfrusco::simulator::ActionResult;
 ///
-/// # let result = ActionResult::DeadEnd;
-/// match &result {
-///     ActionResult::DrilledIn { target_uid } => {
-///         println!("Would drill into Script Filter: {target_uid}");
-///     }
-///     ActionResult::OpenedUrl { url_template } => {
-///         println!("Would open URL: {url_template}");
-///     }
-///     ActionResult::RanScript { target_uid } => {
-///         println!("Would run script at: {target_uid}");
-///     }
-///     ActionResult::TypedAutocomplete { text } => {
-///         println!("Would autocomplete to: {text}");
-///     }
-///     ActionResult::DeadEnd => {
-///         println!("No route found (dead-end)");
-///     }
-/// }
+/// let result = ActionResult::DrilledIn {
+///     target_uid: "SF-SUB-001".to_string(),
+/// };
+/// assert_eq!(result.assert_drills_in(), "SF-SUB-001");
+///
+/// let result = ActionResult::OpenedUrl {
+///     url_template: "{query}".to_string(),
+/// };
+/// assert_eq!(result.assert_opens_url(), "{query}");
+///
+/// let result = ActionResult::TypedAutocomplete {
+///     text: "fruits".to_string(),
+/// };
+/// assert_eq!(result.assert_autocompletes(), "fruits");
+///
+/// assert!(ActionResult::DeadEnd.is_dead_end());
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionResult {

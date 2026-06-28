@@ -22,13 +22,15 @@ struct ActionContext {
 ///
 /// # Example
 ///
-/// ```no_run
-/// # use alfrusco::simulator::Screen;
-/// # let json = r#"{"items":[{"title":"Hello","arg":"world","valid":true}]}"#;
-/// # let screen = Screen::from_json(json).unwrap();
+/// ```
+/// use alfrusco::simulator::Screen;
+///
+/// let json = r#"{"items":[{"title":"Hello","arg":"world","valid":true}]}"#;
+/// let screen = Screen::from_json(json).unwrap();
 /// assert_eq!(screen.items().len(), 1);
 /// assert_eq!(screen.items()[0].title(), "Hello");
 /// assert_eq!(screen.items()[0].arg(), Some("world"));
+/// assert!(screen.items()[0].is_valid());
 /// ```
 #[derive(Debug, Clone)]
 pub struct Screen {
