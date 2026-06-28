@@ -12,6 +12,10 @@ keywords = ["alfred", "workflow", "macos", "automation"]
 categories = ["os::macos-apis", "gui"]
 exclude = [".cargo-husky/", ".claude/", ".github/", ".idea/", "workflow/", "AGENTS.md"]
 
+[[bin]]
+name = "alfrusco-simulator"
+path = "src/bin/alfrusco_simulator.rs"
+
 [dependencies]
 async-trait = "0.1"
 chrono = "0.4"
