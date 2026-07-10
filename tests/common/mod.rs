@@ -65,7 +65,9 @@ pub fn wait_for_job_status(
 ) -> Result<(), String> {
     use std::time::SystemTime;
 
-    let start_time = SystemTime::now();
+    // Subtract a small buffer to account for filesystem time resolution differences
+    // between the Rust process and the spawned bash process.
+    let start_time = SystemTime::now() - std::time::Duration::from_secs(2);
     let start = std::time::Instant::now();
     let timeout = std::time::Duration::from_millis(timeout_ms);
     let job_dir = status_file.parent().unwrap();
