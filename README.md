@@ -655,3 +655,7 @@ MIT License - see [LICENSE](LICENSE).
 - [Documentation](https://docs.rs/alfrusco)
 - [Issues](https://github.com/adlio/alfrusco/issues)
 - [Discussions](https://github.com/adlio/alfrusco/discussions)
+
+---
+
+Last updated: 2026-04-29
