@@ -546,7 +546,7 @@ impl WorkflowGraph {
 
                 // If this is a CallExternalTrigger, resolve to the matching trigger input
                 if node.kind == ObjectKind::CallExternalTrigger {
-                    if let Some(trigger_id) = node.config_value("triggerid") {
+                    if let Some(trigger_id) = node.config_value("externaltriggerid") {
                         if let Some(trigger_uid) = self.external_trigger_uid(trigger_id) {
                             if !visited.contains(trigger_uid) {
                                 visited.insert(trigger_uid.to_string());

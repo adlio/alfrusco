@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **External Trigger resolution used the wrong config key** — `resolve_external_trigger` and
+  `reachable_kinds` looked up `triggerid` on `CallExternalTrigger` nodes, but real Alfred plists
+  use `externaltriggerid` on the *output* side (`triggerid` belongs only to the `ExternalTrigger`
+  *input* node). Every External-Trigger drill-in in a real workflow therefore resolved to
+  `DeadEnd`/unreachable. Undetected because the test fixture used the wrong key on both sides;
+  the fixture and its assertion are corrected too.
+
 ### Changed
 - **Faithful routing in dynamic audit** — the audit now models Alfred's actual routing semantics:
   - Evaluates Conditional nodes' `matchstring`/`matchmode`/`matchcasesensitive` against the actioned item's `arg` (instead of heuristically assuming "carries variables ⇒ navigation").

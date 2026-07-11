@@ -63,7 +63,10 @@ fn parses_call_external_trigger_node() {
     let graph = load_graph();
     let node = graph.objects().get("CALL-TRIGGER-001").unwrap();
     assert_eq!(node.kind, ObjectKind::CallExternalTrigger);
-    assert_eq!(node.config_value("triggerid"), Some("sub-menu-trigger"));
+    assert_eq!(
+        node.config_value("externaltriggerid"),
+        Some("sub-menu-trigger")
+    );
 }
 
 #[test]

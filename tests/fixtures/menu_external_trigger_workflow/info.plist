@@ -117,7 +117,7 @@
 		<dict>
 			<key>config</key>
 			<dict>
-				<key>triggerid</key>
+				<key>externaltriggerid</key>
 				<string>sub-menu-trigger</string>
 			</dict>
 			<key>type</key>

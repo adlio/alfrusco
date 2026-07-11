@@ -365,7 +365,7 @@ fn resolve_external_trigger(
     modifiers: u64,
     visited: &mut Vec<String>,
 ) -> ActionResult {
-    let Some(trigger_id) = call_node.config_value("triggerid") else {
+    let Some(trigger_id) = call_node.config_value("externaltriggerid") else {
         return ActionResult::DeadEnd;
     };
 
