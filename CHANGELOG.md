@@ -5,9 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.3] - 2026-07-19
+
+### Added
+- **`Item::pin_to_bottom(bool)`** — pin an item to the bottom of results, exempt from
+  fuzzy filtering (the counterpart to `sticky`, which pins to the top). Sorting now
+  assembles three zones: sticky (top), filtered results (middle), bottom-pinned (last).
 
 ### Fixed
+- **Background job status rows no longer disturb list navigation.** The item emitted by
+  `run_in_background` previously had no `uid` and participated in fuzzy filtering — its
+  "running for Ns" subtitle changed its match score every rerun, so it flickered in and
+  out of results at a score-dependent position, reshuffling the list under the user's
+  selection. It is now bottom-pinned with a stable `uid` (`background-job:{id}`), so it
+  stays visible with live progress while Alfred preserves the selection across reruns.
 - Clippy `useless_borrows_in_formatting` errors on Rust ≥1.97 (redundant `&` in two
   `format!` args in `url_item.rs`) that broke CI. No behavior change.
 
@@ -135,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive error handling
 
 [Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.2...HEAD
+[0.4.3]: https://github.com/adlio/alfrusco/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/adlio/alfrusco/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/adlio/alfrusco/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/adlio/alfrusco/compare/v0.3.0...v0.4.0
