@@ -17,6 +17,18 @@ pub fn handle_clipboard() -> bool {
     if let Some(cmd) = cmd {
         debug!("ALFRUSCO_COMMAND provided: {cmd}");
 
+        if cmd == "copytext" {
+            if let Ok(text) = var("TEXT") {
+                if let Err(e) = copy_text_to_clipboard(text) {
+                    error!("Clipboard operation failed: {e}");
+                }
+                if let Err(e) = Response::new().write(std::io::stdout()) {
+                    error!("Error writing response: {e}");
+                }
+                return true;
+            }
+        }
+
         if cmd == "richtext" || cmd == "markdown" {
             if let (Some(title), Some(url)) = (title, url) {
                 let result = if cmd == "richtext" {
@@ -57,6 +69,18 @@ pub fn format_html_link(title: impl Into<String>, url: impl Into<String>) -> Str
     let title = title.into();
     let url = url.into();
     format!("<a href=\"{url}\">{title}</a>")
+}
+
+/// Copy plain text to the clipboard.
+pub fn copy_text_to_clipboard(text: impl Into<String>) -> Result<()> {
+    let text = text.into();
+    let mut ctx = Clipboard::new()
+        .map_err(|e| Error::Clipboard(format!("Failed to initialize clipboard: {e}")))?;
+    ctx.set_text(&text)
+        .map_err(|e| Error::Clipboard(format!("Failed to set clipboard text: {e}")))?;
+
+    info!("Wrote text to clipboard: {text}");
+    Ok(())
 }
 
 /// Copy a Markdown link to the clipboard.
@@ -130,6 +154,7 @@ mod tests {
         std::env::remove_var("ALFRUSCO_COMMAND");
         std::env::remove_var("TITLE");
         std::env::remove_var("URL");
+        std::env::remove_var("TEXT");
     }
 
     #[test]
@@ -180,6 +205,40 @@ mod tests {
         assert!(
             !result,
             "handle_clipboard should return false for missing params"
+        );
+
+        cleanup_env_vars();
+    }
+
+    #[test]
+    fn test_handle_clipboard_copytext() {
+        initialize();
+        cleanup_env_vars();
+
+        std::env::set_var("ALFRUSCO_COMMAND", "copytext");
+        std::env::set_var("TEXT", "KIROWEB-794");
+
+        let result = handle_clipboard();
+        assert!(
+            result,
+            "handle_clipboard should return true for copytext command"
+        );
+
+        cleanup_env_vars();
+    }
+
+    #[test]
+    fn test_handle_clipboard_copytext_missing_text() {
+        initialize();
+        cleanup_env_vars();
+
+        std::env::set_var("ALFRUSCO_COMMAND", "copytext");
+        // Don't set TEXT - it should be missing
+
+        let result = handle_clipboard();
+        assert!(
+            !result,
+            "handle_clipboard should return false when copytext has no TEXT"
         );
 
         cleanup_env_vars();
