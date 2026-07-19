@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-18
+
 ### Fixed
 - **External Trigger resolution used the wrong config key** — `resolve_external_trigger` and
   `reachable_kinds` looked up `triggerid` on `CallExternalTrigger` nodes, but real Alfred plists
@@ -14,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   *input* node). Every External-Trigger drill-in in a real workflow therefore resolved to
   `DeadEnd`/unreachable. Undetected because the test fixture used the wrong key on both sides;
   the fixture and its assertion are corrected too.
+
+### Added
+- **`copytext` clipboard command** — `ALFRUSCO_COMMAND=copytext` with a `TEXT` env var copies
+  arbitrary plain text to the clipboard, alongside the existing `markdown`/`richtext` link
+  commands. Backed by the public `copy_text_to_clipboard()` helper.
+
+## [0.4.1] - 2026-06-30
 
 ### Changed
 - **Faithful routing in dynamic audit** — the audit now models Alfred's actual routing semantics:
@@ -121,7 +130,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fuzzy filtering and sorting
 - Comprehensive error handling
 
-[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/adlio/alfrusco/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/adlio/alfrusco/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/adlio/alfrusco/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/adlio/alfrusco/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/adlio/alfrusco/compare/v0.2.0...v0.2.1
