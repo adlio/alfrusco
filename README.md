@@ -230,6 +230,11 @@ impl Runnable for MyWorkflow {
             Duration::from_secs(30),
             cmd
         );
+        // While the job is stale/running, a status row with live progress is
+        // pinned to the bottom of the results (stable uid, exempt from
+        // filtering) and a 1-second rerun is scheduled so results refresh
+        // when the job completes. The row never displaces or reshuffles the
+        // selectable items above it.
 
         if cache_file.exists() {
             if let Ok(data) = std::fs::read_to_string(&cache_file) {
@@ -329,6 +334,32 @@ Boost constants:
 - `BOOST_HIGHEST` (200)
 
 Boost only affects non-sticky items. Use `.sticky(true)` for items that should always appear first.
+
+#### Pinning Items
+
+Two flags exempt an item from fuzzy filtering and give it a fixed position:
+
+- `.sticky(true)` — pinned to the **top**, before all filtered results. Use for
+  headers and "Back" navigation rows.
+- `.pin_to_bottom(true)` — pinned to the **bottom**, after all filtered results.
+  Use for status/footer rows (e.g. background job progress) that should stay
+  visible without reshuffling or displacing the selectable results above them.
+
+```rust
+workflow.append_items(vec![
+    Item::new("‹ Back").sticky(true),
+    Item::new("Result A"),
+    Item::new("Result B"),
+    Item::new("Syncing…")
+        .subtitle("Background refresh in progress")
+        .valid(false)
+        .pin_to_bottom(true),
+]);
+```
+
+Pinned items keep the order they were added within their zone. If both flags
+are set, `sticky` wins. Give pinned rows a stable `uid` so Alfred preserves
+the user's selection across `rerun` cycles.
 
 ### Workflow Directories
 
@@ -572,6 +603,7 @@ cargo run --example static_output
 - `autocomplete(text)` - Set tab completion
 - `modifier(modifier)` - Add modifier actions
 - `sticky(bool)` - Pin to top
+- `pin_to_bottom(bool)` - Pin to bottom (filter-exempt status/footer rows)
 - `boost(value)` - Adjust ranking
 
 ### `URLItem`

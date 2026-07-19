@@ -142,7 +142,9 @@ impl<'a> BackgroundJob<'a> {
                             let stale_item = Item::new(format!("Background Job '{}'", self.name))
                                 .subtitle(subtitle)
                                 .icon(icon)
-                                .valid(false);
+                                .valid(false)
+                                .uid(format!("background-job:{}", self.id))
+                                .pin_to_bottom(true);
                             Some(stale_item)
                         }
                         None => {
@@ -159,7 +161,9 @@ impl<'a> BackgroundJob<'a> {
                             let stale_item = Item::new(format!("Background Job '{}'", self.name))
                                 .subtitle(subtitle)
                                 .icon(icon)
-                                .valid(false);
+                                .valid(false)
+                                .uid(format!("background-job:{}", self.id))
+                                .pin_to_bottom(true);
                             Some(stale_item)
                         }
                     }
@@ -168,7 +172,9 @@ impl<'a> BackgroundJob<'a> {
             Err(e) => {
                 error!("Error starting job '{}': {}", self.name, e);
                 let error_item = Item::new(format!("Background Job '{}'", self.name))
-                    .subtitle(format!("Error starting job: {e}"));
+                    .subtitle(format!("Error starting job: {e}"))
+                    .uid(format!("background-job:{}", self.id))
+                    .pin_to_bottom(true);
                 Some(error_item)
             }
         }

@@ -11,13 +11,17 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
         query
     );
 
-    // First, separate sticky items from regular items
-    let (sticky_items, regular_items): (Vec<Item>, Vec<Item>) =
+    // Separate items into three groups: sticky (pinned to top), bottom-pinned
+    // (pinned to bottom), and regular items (fuzzy filtered + sorted).
+    let (sticky_items, rest): (Vec<Item>, Vec<Item>) =
         items.into_iter().partition(|item| item.sticky);
+    let (bottom_items, regular_items): (Vec<Item>, Vec<Item>) =
+        rest.into_iter().partition(|item| item.pin_to_bottom);
 
     debug!(
-        "Found {} sticky items and {} regular items",
+        "Found {} sticky items, {} bottom-pinned items, and {} regular items",
         sticky_items.len(),
+        bottom_items.len(),
         regular_items.len()
     );
 
@@ -45,25 +49,14 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
     filtered_items.sort_unstable_by_key(|item| std::cmp::Reverse(item.1));
 
     // Extract the items from the tuples
-    let mut result: Vec<Item> = filtered_items.into_iter().map(|(item, _)| item).collect();
+    let result: Vec<Item> = filtered_items.into_iter().map(|(item, _)| item).collect();
 
-    // Add sticky items at the beginning, regardless of query
-    if !sticky_items.is_empty() {
-        debug!(
-            "Adding {} sticky items to the beginning of results",
-            sticky_items.len()
-        );
-        let mut final_result = sticky_items;
-        final_result.append(&mut result);
-        debug!("Final result has {} items", final_result.len());
-        final_result
-    } else {
-        debug!(
-            "No sticky items to add, returning {} filtered items",
-            result.len()
-        );
-        result
-    }
+    // Assemble: sticky items first, filtered regular items, bottom-pinned last.
+    let mut final_result = sticky_items;
+    final_result.extend(result);
+    final_result.extend(bottom_items);
+    debug!("Final result has {} items", final_result.len());
+    final_result
 }
 
 #[cfg(test)]
@@ -137,6 +130,40 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert!(result.iter().any(|item| item.title == "Configuration"));
         assert!(result.iter().any(|item| item.title == "Profile"));
+    }
+
+    #[test]
+    fn test_filter_with_bottom_pinned_items() {
+        let items = vec![
+            Item::new("Apple").subtitle("Fruit"),
+            Item::new("Status Row")
+                .subtitle("Job running")
+                .pin_to_bottom(true),
+            Item::new("Banana").subtitle("Fruit"),
+        ];
+
+        // Bottom-pinned items appear last and are exempt from filtering
+        // (the query doesn't match "Status Row" but it survives anyway).
+        let result = filter_and_sort_items(items, "fruit".to_string());
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[2].title, "Status Row");
+        assert!(result[..2].iter().any(|item| item.title == "Apple"));
+        assert!(result[..2].iter().any(|item| item.title == "Banana"));
+    }
+
+    #[test]
+    fn test_sticky_regular_and_bottom_ordering() {
+        let items = vec![
+            Item::new("Footer").subtitle("Item").pin_to_bottom(true),
+            Item::new("Normal").subtitle("Item"),
+            Item::new("Header").subtitle("Item").sticky(true),
+        ];
+
+        let result = filter_and_sort_items(items, "item".to_string());
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].title, "Header"); // sticky first
+        assert_eq!(result[1].title, "Normal"); // filtered middle
+        assert_eq!(result[2].title, "Footer"); // bottom-pinned last
     }
 
     #[test]

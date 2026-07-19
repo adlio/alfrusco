@@ -81,6 +81,13 @@ pub struct Item {
     #[serde(skip_serializing)]
     pub(crate) sticky: bool,
 
+    /// When true, the item is pinned to the bottom of results and exempt
+    /// from fuzzy filtering (the counterpart to `sticky`, which pins to the
+    /// top). Useful for status/footer rows that should stay visible without
+    /// disturbing the selectable list above them.
+    #[serde(skip_serializing)]
+    pub(crate) pin_to_bottom: bool,
+
     /// Boost value added to the fuzzy match score for sorting.
     /// Higher values rank the item higher in results.
     #[serde(skip_serializing)]
@@ -183,6 +190,20 @@ impl Item {
 
     pub fn sticky(mut self, is_sticky: bool) -> Self {
         self.sticky = is_sticky;
+        self
+    }
+
+    /// Pin this item to the bottom of the result list.
+    ///
+    /// Bottom-pinned items are exempt from fuzzy filtering and always appear
+    /// after all other items, in the order they were added. This is the
+    /// counterpart to [`Item::sticky`], which pins items to the top.
+    ///
+    /// Use this for status rows (e.g. background job progress) that should
+    /// remain visible without reshuffling or displacing the selectable
+    /// results above them.
+    pub fn pin_to_bottom(mut self, pin: bool) -> Self {
+        self.pin_to_bottom = pin;
         self
     }
 
