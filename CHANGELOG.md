@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Clippy `useless_borrows_in_formatting` errors on Rust ≥1.97 (redundant `&` in two
+  `format!` args in `url_item.rs`) that broke CI. No behavior change.
+
 ## [0.4.2] - 2026-07-18
 
 ### Fixed

@@ -91,13 +91,13 @@ impl From<URLItem> for Item {
         let copy_text = url_item.copy_text.clone();
 
         let cmd_mod = Modifier::new(Key::Cmd)
-            .subtitle(format!("Copy Markdown Link '{}'", &title))
+            .subtitle(format!("Copy Markdown Link '{title}'"))
             .arg("run")
             .var("ALFRUSCO_COMMAND", "markdown")
             .var("TITLE", &title)
             .var("URL", &url);
         let alt_mod = Modifier::new(Key::Alt)
-            .subtitle(format!("Copy Rich Text Link '{}'", &title))
+            .subtitle(format!("Copy Rich Text Link '{title}'"))
             .arg("run")
             .var("ALFRUSCO_COMMAND", "richtext")
             .var("TITLE", &title)
