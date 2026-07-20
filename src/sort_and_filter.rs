@@ -25,7 +25,12 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
         regular_items.len()
     );
 
-    let matcher = SkimMatcherV2::default();
+    // Case-insensitive matching: the default "smart case" turns
+    // case-sensitive when the query contains any uppercase letter, which
+    // makes mixed-case queries (e.g. "Nasa Hq") fail against all-caps
+    // candidates (e.g. "NASA HQ"). Launcher-style filtering should never
+    // gate on case.
+    let matcher = SkimMatcherV2::default().ignore_case();
 
     // Filter and score regular items, adding boost to the score
     let mut filtered_items: Vec<(Item, i64)> = regular_items
@@ -62,6 +67,18 @@ pub fn filter_and_sort_items(items: Vec<Item>, query: String) -> Vec<Item> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_mixed_case_query_matches_all_caps_candidate() {
+        // Smart-case regression guard: "Nasa Hq" must match "NASA HQ".
+        let items = vec![
+            Item::new("NASA HQ").subtitle("Room"),
+            Item::new("Unrelated").subtitle("Room"),
+        ];
+        let result = filter_and_sort_items(items, "Nasa Hq".to_string());
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "NASA HQ");
+    }
 
     #[test]
     fn test_filter_and_sort_items_basic_matching() {
