@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`URLItem::link_action_items()`** — generates the standard set of link-action rows
+  for a URL: an Open row; Markdown + Rich Text copy rows for each unique link text
+  (short title, title, `"{short} — {title}"` combined form, explicit long title —
+  deduplicated); and a plain Copy URL row (`copytext`). Rows carry item-level
+  command variables and stable uids. Use to build link submenus when modifier keys
+  aren't enough.
+- **Stable auto-uids under `skip_knowledge`** — responses flagged `skip_knowledge(true)`
+  assign a deterministic, title-derived uid to any item lacking one at write time, so
+  the user's selection survives `rerun` cycles (e.g. while a background job re-renders
+  results every second). Only done under `skipknowledge`, where uids cannot affect
+  ranking; explicit uids are never modified.
+
+### Fixed
+- **Fuzzy filtering is now case-insensitive.** The matcher's default "smart case"
+  became case-sensitive whenever the query contained an uppercase letter, so
+  mixed-case queries (e.g. `Nasa Hq`) failed against all-caps candidates
+  (e.g. `NASA HQ`).
+
 ## [0.4.3] - 2026-07-19
 
 ### Added

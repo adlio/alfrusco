@@ -76,6 +76,89 @@ impl URLItem {
         self.variables.insert(key.into(), value.into());
         self
     }
+
+    /// The combined `"{short_title} — {title}"` link text, available when
+    /// a short title is set. This is one of the standard link-text forms
+    /// offered by [`URLItem::link_action_items`]; it does not affect the
+    /// independently settable `long_title`.
+    fn combined_title(&self) -> Option<String> {
+        self.short_title
+            .as_ref()
+            .map(|short| format!("{} \u{2014} {}", short, self.title))
+    }
+
+    /// The unique link texts in standard order: short title, title,
+    /// combined (`"{short} — {title}"`), then the explicit long title.
+    /// Empty and duplicate entries are dropped.
+    fn link_titles(&self) -> Vec<String> {
+        let mut titles: Vec<String> = Vec::with_capacity(4);
+        let mut push_unique = |t: String| {
+            if !t.is_empty() && !titles.contains(&t) {
+                titles.push(t);
+            }
+        };
+        if let Some(short) = &self.short_title {
+            push_unique(short.clone());
+        }
+        push_unique(self.title.clone());
+        if let Some(combined) = self.combined_title() {
+            push_unique(combined);
+        }
+        if let Some(long) = &self.long_title {
+            push_unique(long.clone());
+        }
+        titles
+    }
+
+    /// Generate the standard set of link-action rows for this URL:
+    /// an "Open" row, a Markdown + Rich Text copy row per unique link
+    /// text (short title, title, `"{short} — {title}"`, explicit long
+    /// title — deduplicated), and a plain "Copy URL" row.
+    ///
+    /// Copy rows carry item-level variables (`ALFRUSCO_COMMAND` +
+    /// `TITLE`/`URL`/`TEXT`) with `arg = "run"`, and the Open row's arg
+    /// is the URL itself — matching the conventions `URLItem`'s copy
+    /// modifiers already use. Use these rows to build a link submenu
+    /// when modifier keys alone aren't enough (or aren't reliable).
+    pub fn link_action_items(&self) -> Vec<Item> {
+        let url = &self.url;
+        let mut rows = vec![Item::new(format!("Open '{}'", self.title))
+            .subtitle(url)
+            .arg(url)
+            .copy_text(url)
+            .uid(format!("link-action:open:{url}"))];
+
+        for title in self.link_titles() {
+            rows.push(
+                Item::new(format!("Copy Markdown Link '{title}'"))
+                    .subtitle(format!("[{title}]({url})"))
+                    .arg("run")
+                    .var("ALFRUSCO_COMMAND", "markdown")
+                    .var("TITLE", &title)
+                    .var("URL", url)
+                    .uid(format!("link-action:markdown:{title}:{url}")),
+            );
+            rows.push(
+                Item::new(format!("Copy Rich Text Link '{title}'"))
+                    .subtitle(format!("{title} \u{2192} {url}"))
+                    .arg("run")
+                    .var("ALFRUSCO_COMMAND", "richtext")
+                    .var("TITLE", &title)
+                    .var("URL", url)
+                    .uid(format!("link-action:richtext:{title}:{url}")),
+            );
+        }
+
+        rows.push(
+            Item::new("Copy URL")
+                .subtitle(url)
+                .arg("run")
+                .var("ALFRUSCO_COMMAND", "copytext")
+                .var("TEXT", url)
+                .uid(format!("link-action:copytext:{url}")),
+        );
+        rows
+    }
 }
 
 impl From<URLItem> for Item {
@@ -184,6 +267,75 @@ mod tests {
 
     use super::*;
     use crate::Arg;
+
+    #[test]
+    fn test_link_action_items_includes_explicit_long_title() {
+        // long_title stays an independent, manually-set link text: with
+        // all three set, rows cover short, title, combined, and long.
+        let rows = URLItem::new("My Search", "https://example.com/s/1")
+            .short_title("Search")
+            .long_title("My Search in My Room")
+            .link_action_items();
+
+        // Open + (Markdown+RichText) × 4 texts + Copy URL = 10 rows
+        assert_eq!(rows.len(), 10);
+        assert_eq!(
+            rows[5].title,
+            "Copy Markdown Link 'Search \u{2014} My Search'"
+        );
+        assert_eq!(rows[7].title, "Copy Markdown Link 'My Search in My Room'");
+    }
+
+    #[test]
+    fn test_no_derived_long_title_modifiers() {
+        // A short_title alone must NOT create the cmd+ctrl/alt+ctrl
+        // modifiers — those belong to the explicitly set long_title.
+        let item: Item = URLItem::new("Title", "https://example.com")
+            .short_title("Short")
+            .into();
+        assert!(!item.modifiers.contains_key("cmd+ctrl"));
+        assert!(!item.modifiers.contains_key("alt+ctrl"));
+    }
+
+    #[test]
+    fn test_link_action_items_standard_set() {
+        let rows = URLItem::new("My Search", "https://example.com/s/1")
+            .short_title("Search")
+            .link_action_items();
+
+        // Open + (Markdown+RichText) × 3 titles + Copy URL = 8 rows
+        assert_eq!(rows.len(), 8);
+        assert_eq!(rows[0].title, "Open 'My Search'");
+        assert_eq!(rows[1].title, "Copy Markdown Link 'Search'");
+        assert_eq!(rows[2].title, "Copy Rich Text Link 'Search'");
+        assert_eq!(rows[3].title, "Copy Markdown Link 'My Search'");
+        assert_eq!(
+            rows[5].title,
+            "Copy Markdown Link 'Search \u{2014} My Search'"
+        );
+        assert_eq!(rows[7].title, "Copy URL");
+
+        // Copy rows carry the item-level command variables.
+        assert_eq!(
+            rows[1].variables.get("ALFRUSCO_COMMAND"),
+            Some(&"markdown".to_string())
+        );
+        assert_eq!(
+            rows[7].variables.get("ALFRUSCO_COMMAND"),
+            Some(&"copytext".to_string())
+        );
+        assert_eq!(
+            rows[7].variables.get("TEXT"),
+            Some(&"https://example.com/s/1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_link_action_items_dedupes_titles() {
+        // No short title: only the bare title's two copy rows + open + url.
+        let rows = URLItem::new("Only Title", "https://example.com").link_action_items();
+        assert_eq!(rows.len(), 4);
+    }
 
     #[test]
     fn test_new_url_item() {

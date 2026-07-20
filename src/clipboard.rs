@@ -216,7 +216,7 @@ mod tests {
         cleanup_env_vars();
 
         std::env::set_var("ALFRUSCO_COMMAND", "copytext");
-        std::env::set_var("TEXT", "KIROWEB-794");
+        std::env::set_var("TEXT", "TICKET-42");
 
         let result = handle_clipboard();
         assert!(
