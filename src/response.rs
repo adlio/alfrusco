@@ -65,7 +65,17 @@ impl Response {
         self
     }
 
-    /// When set to true, Alfred will not learn from the user's selection.
+    /// When set to true, Alfred will not learn from the user's selection
+    /// and will present items in the order provided.
+    ///
+    /// In Alfred, an item's `uid` has two effects: it lets Alfred keep the
+    /// user's selection on that item across `rerun` cycles, and it enrolls
+    /// the item in Alfred's usage-based ranking. With `skipknowledge` set,
+    /// the ranking effect is disabled — a uid then only stabilizes
+    /// selection. Because that is purely beneficial, [`Response::write`]
+    /// auto-assigns a deterministic, title-derived uid to any item that
+    /// doesn't have one when this flag is true. Explicitly set uids are
+    /// never modified.
     pub fn skip_knowledge(&mut self, skip_knowledge: bool) -> &mut Self {
         self.skip_knowledge = Some(skip_knowledge);
         self
@@ -101,7 +111,33 @@ impl Response {
     }
 
     /// Writes the Alfred response to the provided writer.
+    ///
+    /// When `skip_knowledge` is true, items lacking a `uid` receive a
+    /// deterministic, title-derived one (`menu:{title}`, with an
+    /// occurrence suffix for duplicate titles). See
+    /// [`Response::skip_knowledge`] for why this is only done under that
+    /// flag: without `skipknowledge`, adding uids would enroll the items
+    /// in Alfred's usage-based ranking, which authors opt out of by
+    /// omitting uids.
     pub fn write<W: io::Write>(&self, writer: W) -> Result<()> {
+        if self.skip_knowledge == Some(true) {
+            let mut patched = self.clone();
+            let mut seen = std::collections::HashMap::new();
+            for item in &mut patched.items {
+                if item.uid.is_none() {
+                    let n = seen
+                        .entry(item.title.clone())
+                        .and_modify(|c| *c += 1)
+                        .or_insert(0usize);
+                    item.uid = Some(if *n == 0 {
+                        format!("menu:{}", item.title)
+                    } else {
+                        format!("menu:{}:{}", item.title, n)
+                    });
+                }
+            }
+            return Ok(serde_json::to_writer(writer, &patched)?);
+        }
         Ok(serde_json::to_writer(writer, self)?)
     }
 }
@@ -137,6 +173,36 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_menu_mode_assigns_stable_uids() -> Result<()> {
+        let mut response = Response::new_with_items(vec![
+            Item::new("Open"),
+            Item::new("Copy").uid("explicit:uid"),
+            Item::new("Open"), // duplicate title
+        ]);
+        response.skip_knowledge(true);
+
+        let mut buffer = Vec::new();
+        response.write(&mut buffer)?;
+        let json: serde_json::Value = serde_json::from_slice(&buffer)?;
+        let items = json["items"].as_array().unwrap();
+        assert_eq!(items[0]["uid"], "menu:Open");
+        assert_eq!(items[1]["uid"], "explicit:uid"); // untouched
+        assert_eq!(items[2]["uid"], "menu:Open:1"); // disambiguated
+        assert_eq!(json["skipknowledge"], true);
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_auto_uids_without_skip_knowledge() -> Result<()> {
+        let response = Response::new_with_items(vec![Item::new("Open")]);
+        let mut buffer = Vec::new();
+        response.write(&mut buffer)?;
+        let json: serde_json::Value = serde_json::from_slice(&buffer)?;
+        assert!(json["items"][0].get("uid").is_none());
+        Ok(())
+    }
 
     #[test]
     fn test_empty_response() -> Result<()> {
@@ -412,8 +478,9 @@ mod tests {
             .skip_knowledge(true)
             .cache(Duration::from_mins(1), false);
 
+        // skip_knowledge auto-assigns a title-derived uid at write time.
         assert_matches(
-            r#"{"rerun":5,"cache":{"seconds":60,"loosereload":false},"skipknowledge":true,"items":[{"title":"Test Item"}]}"#,
+            r#"{"rerun":5,"cache":{"seconds":60,"loosereload":false},"skipknowledge":true,"items":[{"title":"Test Item","uid":"menu:Test Item"}]}"#,
             response,
         )
     }
