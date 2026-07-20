@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.4] - 2026-07-19
 
 ### Added
 - **`URLItem::link_action_items()`** — generates the standard set of link-action rows
@@ -166,7 +166,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fuzzy filtering and sorting
 - Comprehensive error handling
 
-[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/adlio/alfrusco/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/adlio/alfrusco/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/adlio/alfrusco/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/adlio/alfrusco/compare/v0.4.0...v0.4.1
