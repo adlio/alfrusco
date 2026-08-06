@@ -81,23 +81,22 @@ fn test_background_job_success_status() {
     let (mut workflow, temp_dir) = create_test_workflow_with_temp();
     let temp_path = temp_dir.path();
 
+    let job_id = create_job_id("success_job");
+    let job_dir = temp_path.join("jobs").join(&job_id);
+    let status_file = job_dir.join("job.status");
+
     // Run a command that will succeed
     let mut cmd = Command::new("echo");
     cmd.arg("success test");
     workflow.run_in_background("success_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(500);
-
-    // Find the job directory that was created
-    let jobs_dir = temp_path.join("jobs");
-    let job_dir = find_job_directory(&jobs_dir).expect("Should have found a job directory");
+    // Wait for the job to actually complete with "success" status
+    wait_for_job_status(&status_file, "success", 5000)
+        .expect("Job should complete with 'success' status");
 
     // Verify that the status file shows "success"
-    let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(status.trim(), "success");
-    }
+    let status = fs::read_to_string(&status_file).unwrap();
+    assert_eq!(status.trim(), "success");
 
     // Verify that the last_run file was created (since the job succeeded)
     let last_run_file = job_dir.join("job.last_run");
@@ -112,19 +111,19 @@ fn test_background_job_failure_status() {
     // Create the job directory
     let job_dir = temp_path.join("jobs").join(create_job_id("failure_job"));
     fs::create_dir_all(&job_dir).unwrap();
+    let status_file = job_dir.join("job.status");
 
     // Run a command that will fail
     let cmd = Command::new("false"); // Command that always fails
     workflow.run_in_background("failure_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(500);
+    // Wait for the job to actually complete with "failed" status
+    wait_for_job_status(&status_file, "failed", 5000)
+        .expect("Job should complete with 'failed' status");
 
     // Verify that the status file shows "failed"
-    let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(status.trim(), "failed");
-    }
+    let status = fs::read_to_string(&status_file).unwrap();
+    assert_eq!(status.trim(), "failed");
 
     // Verify that the last_run file was created (even for failed jobs)
     let last_run_file = job_dir.join("job.last_run");
@@ -178,6 +177,10 @@ fn test_shell_escaping_in_background_jobs() {
     let (mut workflow, temp_dir) = create_test_workflow_with_temp();
     let temp_path = temp_dir.path();
 
+    let job_id = create_job_id("quoted_args_job");
+    let job_dir = temp_path.join("jobs").join(&job_id);
+    let status_file = job_dir.join("job.status");
+
     // Create a command with arguments that need proper escaping
     let mut cmd = Command::new("echo");
     cmd.arg("Hello World"); // Argument with spaces
@@ -186,26 +189,15 @@ fn test_shell_escaping_in_background_jobs() {
     // Run the command in the background
     workflow.run_in_background("quoted_args_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(500);
-
-    // Get the job directory and verify it was created successfully
-    let jobs_dir = temp_path.join("jobs");
-    assert!(jobs_dir.exists(), "Jobs directory should exist");
-
-    // Find the job directory
-    let job_dirs: Vec<_> = fs::read_dir(&jobs_dir).unwrap().collect();
-    assert_eq!(job_dirs.len(), 1, "Should have exactly one job directory");
-
-    let job_dir = job_dirs.into_iter().next().unwrap().unwrap().path();
+    // Wait for the job to actually complete with "success" status
+    wait_for_job_status(&status_file, "success", 5000)
+        .expect("Job should have succeeded with proper shell escaping");
 
     // Verify the job completed successfully (shell escaping worked)
-    let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(
-            status.trim(),
-            "success",
-            "Job should have succeeded with proper shell escaping"
-        );
-    }
+    let status = fs::read_to_string(&status_file).unwrap();
+    assert_eq!(
+        status.trim(),
+        "success",
+        "Job should have succeeded with proper shell escaping"
+    );
 }
