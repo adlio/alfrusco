@@ -5,8 +5,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use common::{
-    create_job_id, create_test_workflow_with_temp, find_job_directory, wait_for_job_completion,
-    wait_for_job_status,
+    create_job_id, create_test_workflow_with_temp, find_job_directory, last_run_mtime,
+    wait_for_job_completion, wait_for_job_status,
 };
 
 #[test]
@@ -143,19 +143,24 @@ fn test_failed_jobs_are_retried() {
     let status_file = job_dir.join("job.status");
 
     // Step 1: Run a job that will fail
+    let before_first = last_run_mtime(&job_dir);
     let cmd = Command::new("false");
     workflow.run_in_background("retry_test_job", Duration::from_secs(0), cmd);
 
     // Wait for the job to actually complete with "failed" status
-    wait_for_job_status(&status_file, "failed", 5000)
+    wait_for_job_status(&status_file, "failed", before_first, 5000)
         .expect("First job should complete with 'failed' status");
 
-    // Step 2: Run the same job again - it should be re-run because it failed
+    // Step 2: Run the same job again - it should be re-run because it failed.
+    // Wait past one coarse filesystem clock tick so the second run's last_run
+    // timestamp cannot equal the first one's.
+    std::thread::sleep(Duration::from_millis(50));
+    let before_second = last_run_mtime(&job_dir);
     let cmd2 = Command::new("false");
     workflow.run_in_background("retry_test_job", Duration::from_secs(0), cmd2);
 
     // Wait for the second job to complete
-    wait_for_job_status(&status_file, "failed", 5000)
+    wait_for_job_status(&status_file, "failed", before_second, 5000)
         .expect("Second job should complete with 'failed' status");
 
     // Verify the job directory exists
@@ -208,4 +213,76 @@ fn test_shell_escaping_in_background_jobs() {
             "Job should have succeeded with proper shell escaping"
         );
     }
+}
+
+/// Stops a job's bash wrapper and the command it started.
+fn kill_job(pid: &str) {
+    let _ = Command::new("pkill").args(["-P", pid]).status();
+    let _ = Command::new("kill").arg(pid).status();
+}
+
+#[test]
+fn test_running_job_is_detected_and_not_started_twice() {
+    let (mut workflow, temp_dir) = create_test_workflow_with_temp();
+    let job_dir = temp_dir.path().join("jobs").join(create_job_id("long_job"));
+    let pid_file = job_dir.join("job.pid");
+
+    let mut cmd = Command::new("sleep");
+    cmd.arg("5");
+    workflow.run_in_background("long_job", Duration::from_secs(0), cmd);
+    let first_pid = fs::read_to_string(&pid_file).unwrap();
+
+    // The job is still running, so a second call must report it rather than
+    // start another copy.
+    let mut cmd2 = Command::new("sleep");
+    cmd2.arg("5");
+    workflow.run_in_background("long_job", Duration::from_secs(0), cmd2);
+    let second_pid = fs::read_to_string(&pid_file).unwrap();
+    let status = fs::read_to_string(job_dir.join("job.status")).unwrap();
+
+    kill_job(first_pid.trim());
+
+    assert_eq!(first_pid, second_pid, "a running job must not be restarted");
+    assert_eq!(status.trim(), "running");
+
+    let mut out = Vec::new();
+    workflow.response.write(&mut out).unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let items = json["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2, "one status item per call");
+    let subtitle = items[1]["subtitle"].as_str().unwrap();
+    assert!(
+        subtitle.contains("running for"),
+        "status item should describe the running job: {subtitle}"
+    );
+}
+
+#[test]
+fn test_stale_pid_file_for_exited_process_starts_new_job() {
+    let (mut workflow, temp_dir) = create_test_workflow_with_temp();
+    let job_dir = temp_dir
+        .path()
+        .join("jobs")
+        .join(create_job_id("stale_pid_job"));
+    fs::create_dir_all(&job_dir).unwrap();
+    let pid_file = job_dir.join("job.pid");
+
+    // Leave behind the PID of a process that has already exited and been reaped.
+    let mut gone = Command::new("true").spawn().unwrap();
+    let gone_pid = gone.id();
+    gone.wait().unwrap();
+    fs::write(&pid_file, gone_pid.to_string()).unwrap();
+    fs::write(job_dir.join("job.status"), "running").unwrap();
+
+    let mut cmd = Command::new("sleep");
+    cmd.arg("5");
+    workflow.run_in_background("stale_pid_job", Duration::from_secs(0), cmd);
+
+    let new_pid = fs::read_to_string(&pid_file).unwrap();
+    kill_job(new_pid.trim());
+    assert_ne!(
+        new_pid.trim(),
+        gone_pid.to_string(),
+        "a PID file for an exited process must not block a new run"
+    );
 }
