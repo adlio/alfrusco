@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-11-01
+
+### Changed
+- **Background job checks look up only the job's own process.** `run_in_background`
+  previously built `System::new_all()` and refreshed every process on the host, twice per
+  call, even when no PID file existed. It now skips the lookup entirely when there is no
+  PID file, refreshes only the job's PID with no optional process data, and does it once
+  per call. On a Linux host with about 950 processes (fresh process per run, debug build),
+  a first call with no PID file went from 846-955 ms to under 1 ms. Running-job detection,
+  zombie handling, retry of exited jobs and deduplication are unchanged.
+
+### Fixed
+- **Fast-exiting background jobs no longer stay stuck at `running`.** The `running` status
+  was written after spawning the job, so a job that finished first had its final status
+  overwritten. The status is now written before the spawn; a spawn failure still records
+  `failed`.
+- Background job tests poll for the expected status instead of sleeping a fixed 500 ms,
+  and a retry test no longer depends on file-timestamp clock resolution on Linux.
+- Test assertions updated for new clippy lints on Rust 1.99. No behavior change.
+
 ## [0.4.4] - 2026-07-19
 
 ### Added
@@ -166,7 +186,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fuzzy filtering and sorting
 - Comprehensive error handling
 
-[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/adlio/alfrusco/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/adlio/alfrusco/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/adlio/alfrusco/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/adlio/alfrusco/compare/v0.4.1...v0.4.2
