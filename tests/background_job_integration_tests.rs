@@ -86,18 +86,15 @@ fn test_background_job_success_status() {
     cmd.arg("success test");
     workflow.run_in_background("success_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(500);
-
     // Find the job directory that was created
     let jobs_dir = temp_path.join("jobs");
     let job_dir = find_job_directory(&jobs_dir).expect("Should have found a job directory");
 
-    // Verify that the status file shows "success"
+    // Wait for the status file to show "success". Polling instead of a fixed
+    // sleep keeps the test reliable on slow CI runners.
     let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(status.trim(), "success");
-    }
+    wait_for_job_status(&status_file, "success", None, 5000)
+        .expect("job should complete with status 'success'");
 
     // Verify that the last_run file was created (since the job succeeded)
     let last_run_file = job_dir.join("job.last_run");
@@ -117,14 +114,11 @@ fn test_background_job_failure_status() {
     let cmd = Command::new("false"); // Command that always fails
     workflow.run_in_background("failure_job", Duration::from_secs(0), cmd);
 
-    wait_for_job_completion(500);
-
-    // Verify that the status file shows "failed"
+    // Wait for the status file to show "failed". Polling instead of a fixed
+    // sleep keeps the test reliable on slow CI runners.
     let status_file = job_dir.join("job.status");
-    if status_file.exists() {
-        let status = fs::read_to_string(&status_file).unwrap();
-        assert_eq!(status.trim(), "failed");
-    }
+    wait_for_job_status(&status_file, "failed", None, 5000)
+        .expect("job should complete with status 'failed'");
 
     // Verify that the last_run file was created (even for failed jobs)
     let last_run_file = job_dir.join("job.last_run");
