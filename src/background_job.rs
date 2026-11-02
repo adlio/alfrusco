@@ -616,13 +616,15 @@ mod tests {
         // Spawn and let the child exit without reaping it, so it stays a zombie.
         let mut child = Command::new("true").spawn().unwrap();
         let pid = child.id();
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        let mut result = process_running_duration(pid);
-        while result.is_some() && std::time::Instant::now() < deadline {
+        // Poll for up to 5 s (250 x 20 ms) until the child has exited.
+        let reported_not_running = (0..250).any(|_| {
             std::thread::sleep(Duration::from_millis(20));
-            result = process_running_duration(pid);
-        }
-        assert_eq!(result, None, "an exited, unreaped child is not running");
+            process_running_duration(pid).is_none()
+        });
+        assert!(
+            reported_not_running,
+            "an exited, unreaped child is not running"
+        );
         child.wait().unwrap();
     }
 
