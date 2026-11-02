@@ -224,7 +224,7 @@ mod tests {
     fn test_filter_empty_items() {
         let items: Vec<Item> = vec![];
         let result = filter_and_sort_items(items, "query".to_string());
-        assert!(result.is_empty());
+        assert_eq!(result, [] as [Item; 0]);
     }
 
     #[test]

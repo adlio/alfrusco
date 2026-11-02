@@ -557,7 +557,7 @@ mod tests {
 
             // open_path should not have been called
             let calls = get_mock_open_calls();
-            assert!(calls.is_empty());
+            assert_eq!(calls, [] as [String; 0]);
         });
     }
 
@@ -631,7 +631,7 @@ mod tests {
 
                 // open_path should not have been called
                 let calls = get_mock_open_calls();
-                assert!(calls.is_empty());
+                assert_eq!(calls, [] as [String; 0]);
             },
         );
     }

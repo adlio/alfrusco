@@ -323,22 +323,23 @@ mod tests {
         let actual = String::from_utf8(buffer).unwrap();
 
         // Verify they don't match and the error message is used
-        if actual == expected {
-            panic!("Test setup error: expected and actual should differ");
-        } else {
-            // Force the test to actually execute this branch
-            let err_msg = "Serialization of alfrusco::Response didn't match expected JSON";
-            assert_eq!(
-                err_msg,
-                "Serialization of alfrusco::Response didn't match expected JSON"
-            );
+        assert_ne!(
+            actual, expected,
+            "Test setup error: expected and actual should differ"
+        );
 
-            // Simulate what would happen if assert_matches was called directly
-            let result = std::panic::catch_unwind(|| {
-                assert_eq!(actual, expected, "{err_msg}");
-            });
-            assert!(result.is_err());
-        }
+        // Force the test to actually execute this branch
+        let err_msg = "Serialization of alfrusco::Response didn't match expected JSON";
+        assert_eq!(
+            err_msg,
+            "Serialization of alfrusco::Response didn't match expected JSON"
+        );
+
+        // Simulate what would happen if assert_matches was called directly
+        let result = std::panic::catch_unwind(|| {
+            assert_eq!(actual, expected, "{err_msg}");
+        });
+        assert!(result.is_err());
     }
 
     #[test]
@@ -419,7 +420,7 @@ mod tests {
             // This line would normally be executed if UTF-8 conversion succeeds
             let expected = r#"{"items":[]}"#;
             // Force execution of this line for coverage
-            assert!(!expected.is_empty());
+            assert_ne!(expected, "");
             Ok(())
         })();
 
