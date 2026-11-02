@@ -256,12 +256,14 @@ impl<'a> BackgroundJob<'a> {
             ));
         }
 
-        // Stale and not running, let's start it
+        // Stale and not running, let's start it. Mark the job as running before
+        // spawning: the child writes its final status when it exits, and writing
+        // "running" after the spawn could overwrite that if the child finishes
+        // first.
+        self.save_job_status(JobExecutionStatus::Running)?;
         match self.create_and_run_monitor_script() {
             Ok(pid) => {
                 self.save_pid(pid)?;
-                // Mark as running initially
-                self.save_job_status(JobExecutionStatus::Running)?;
 
                 Ok(BackgroundJobStatus::Stale(
                     staleness,
