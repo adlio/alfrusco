@@ -344,8 +344,8 @@ mod tests {
                 );
                 let config = result.unwrap();
                 // Should have gotten some fallback config
-                assert!(!config.workflow_bundleid.is_empty());
-                assert!(!config.workflow_name.is_empty());
+                assert_ne!(config.workflow_bundleid, "");
+                assert_ne!(config.workflow_name, "");
             },
         );
     }

@@ -63,8 +63,8 @@ fn test_alfred_env_provider_no_env_vars_at_all() {
             let result = provider.config();
             assert!(result.is_ok(), "Expected fallback, got error: {result:?}");
             let config = result.unwrap();
-            assert!(!config.workflow_bundleid.is_empty());
-            assert!(!config.workflow_name.is_empty());
+            assert_ne!(config.workflow_bundleid, "");
+            assert_ne!(config.workflow_name, "");
         },
     );
 }

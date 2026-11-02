@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 // chrono imports removed - no longer needed for last_run file management
 use humantime::format_duration;
 use log::{debug, error, info};
-use sysinfo::System;
+use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 
 use crate::workflow::Workflow;
 use crate::{
@@ -32,6 +32,37 @@ fn shell_escape(s: &str) -> String {
 
     // Otherwise, wrap in single quotes and escape any single quotes within
     format!("'{}'", s.replace('\'', "'\"'\"'"))
+}
+
+/// Returns how long the process `pid` has been running, or `None` if it is not
+/// running.
+///
+/// Only the one PID is refreshed, with no optional process data (command line,
+/// environment, memory, CPU, disk usage). `System::new_all()` followed by a
+/// refresh of every process cost hundreds of milliseconds on hosts with about
+/// 1,000 processes, and that cost was paid on every Alfred invocation.
+fn process_running_duration(pid: u32) -> Option<Duration> {
+    let pid = Pid::from_u32(pid);
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[pid]),
+        true,
+        ProcessRefreshKind::nothing(),
+    );
+
+    system
+        .process(pid)
+        // A zombie (terminated but not yet reaped) is not actually running.
+        // On Linux this matters: our bash child becomes a zombie after it exits
+        // because we never call wait() on it, and we'd otherwise treat the
+        // previous invocation as still in-flight and skip retries.
+        .filter(|p| !matches!(p.status(), ProcessStatus::Zombie))
+        .map(|p| {
+            let start_time = UNIX_EPOCH + Duration::from_secs(p.start_time());
+            SystemTime::now()
+                .duration_since(start_time)
+                .unwrap_or_default()
+        })
 }
 
 /// Creates a filesystem-safe hash from a job name
@@ -186,7 +217,10 @@ impl<'a> BackgroundJob<'a> {
         create_dir_all(self.job_dir())?;
         let staleness = self.get_staleness();
 
-        // Check if there's a process running for this job
+        // Check if there's a process running for this job. This is the only
+        // process lookup per call: cleanup() below only removes the PID file of
+        // a process already known to be gone, so a second lookup would return
+        // the same answer.
         let run_duration = self.get_running_duration();
 
         // If there's no process running but we have a PID file, it means the process
@@ -212,9 +246,6 @@ impl<'a> BackgroundJob<'a> {
             }
         }
 
-        // Check again after cleanup
-        let run_duration = self.get_running_duration();
-
         // Stale, but already running
         if let Some(duration) = run_duration {
             // Mark as running
@@ -225,12 +256,14 @@ impl<'a> BackgroundJob<'a> {
             ));
         }
 
-        // Stale and not running, let's start it
+        // Stale and not running, let's start it. Mark the job as running before
+        // spawning: the child writes its final status when it exits, and writing
+        // "running" after the spawn could overwrite that if the child finishes
+        // first.
+        self.save_job_status(JobExecutionStatus::Running)?;
         match self.create_and_run_monitor_script() {
             Ok(pid) => {
                 self.save_pid(pid)?;
-                // Mark as running initially
-                self.save_job_status(JobExecutionStatus::Running)?;
 
                 Ok(BackgroundJobStatus::Stale(
                     staleness,
@@ -480,26 +513,9 @@ impl<'a> BackgroundJob<'a> {
     /// started. Otherwise, it returns None.
     ///
     fn get_running_duration(&self) -> Option<Duration> {
-        let mut system = System::new_all();
-        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-
-        let pid = self.get_pid();
-        match pid {
-            Ok(pid) => system
-                .process(sysinfo::Pid::from(pid as usize))
-                // A zombie (terminated but not yet reaped) is not actually running.
-                // On Linux this matters: our bash child becomes a zombie after it exits
-                // because we never call wait() on it, and we'd otherwise treat the
-                // previous invocation as still in-flight and skip retries.
-                .filter(|p| !matches!(p.status(), sysinfo::ProcessStatus::Zombie))
-                .map(|p| {
-                    let start_time = UNIX_EPOCH + Duration::from_secs(p.start_time());
-                    SystemTime::now()
-                        .duration_since(start_time)
-                        .unwrap_or_default()
-                }),
-            Err(_) => None,
-        }
+        // No PID file means no job was started: skip the process lookup.
+        let pid = self.get_pid().ok()?;
+        process_running_duration(pid)
     }
 
     /// If the specified job has successfully started before, this returns the duration
@@ -579,6 +595,37 @@ mod tests {
     fn test_create_job_id_is_hex() {
         let id = create_job_id("test_job");
         assert!(id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_process_running_duration_for_live_process() {
+        let duration = process_running_duration(std::process::id());
+        assert!(duration.is_some(), "the test process itself is running");
+    }
+
+    #[test]
+    fn test_process_running_duration_for_reaped_process() {
+        let mut child = Command::new("true").spawn().unwrap();
+        let pid = child.id();
+        child.wait().unwrap();
+        assert_eq!(process_running_duration(pid), None);
+    }
+
+    #[test]
+    fn test_process_running_duration_ignores_zombie() {
+        // Spawn and let the child exit without reaping it, so it stays a zombie.
+        let mut child = Command::new("true").spawn().unwrap();
+        let pid = child.id();
+        // Poll for up to 5 s (250 x 20 ms) until the child has exited.
+        let reported_not_running = (0..250).any(|_| {
+            std::thread::sleep(Duration::from_millis(20));
+            process_running_duration(pid).is_none()
+        });
+        assert!(
+            reported_not_running,
+            "an exited, unreaped child is not running"
+        );
+        child.wait().unwrap();
     }
 
     #[test]

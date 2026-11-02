@@ -323,22 +323,21 @@ mod tests {
         let actual = String::from_utf8(buffer).unwrap();
 
         // Verify they don't match and the error message is used
-        if actual == expected {
-            panic!("Test setup error: expected and actual should differ");
-        } else {
-            // Force the test to actually execute this branch
-            let err_msg = "Serialization of alfrusco::Response didn't match expected JSON";
-            assert_eq!(
-                err_msg,
-                "Serialization of alfrusco::Response didn't match expected JSON"
-            );
+        assert_ne!(
+            actual, expected,
+            "Test setup error: expected and actual should differ"
+        );
 
-            // Simulate what would happen if assert_matches was called directly
-            let result = std::panic::catch_unwind(|| {
-                assert_eq!(actual, expected, "{err_msg}");
-            });
-            assert!(result.is_err());
-        }
+        // Force the test to actually execute this branch
+        let err_msg = "Serialization of alfrusco::Response didn't match expected JSON";
+        assert_eq!(
+            err_msg,
+            "Serialization of alfrusco::Response didn't match expected JSON"
+        );
+
+        // Simulate what would happen if assert_matches was called directly
+        let result = std::panic::catch_unwind(|| assert_eq!(actual, expected, "{err_msg}"));
+        assert!(result.is_err());
     }
 
     #[test]
@@ -413,15 +412,9 @@ mod tests {
         // Corrupt the buffer with invalid UTF-8
         buffer[0] = 0xFF;
 
-        // Create a function that mimics assert_matches but returns a Result
-        let result = (|| -> Result<()> {
-            let _actual = String::from_utf8(buffer)?;
-            // This line would normally be executed if UTF-8 conversion succeeds
-            let expected = r#"{"items":[]}"#;
-            // Force execution of this line for coverage
-            assert!(!expected.is_empty());
-            Ok(())
-        })();
+        // Mimic assert_matches' UTF-8 conversion, converting the error the same
+        // way the `?` operator would
+        let result: Result<()> = String::from_utf8(buffer).map(drop).map_err(Into::into);
 
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("invalid utf-8"));
