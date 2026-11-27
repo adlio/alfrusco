@@ -233,7 +233,7 @@ fn package_problems_cover_files_scripts_ids_and_types() {
         "error: /window/root/components/11/events/0/action/1/src: script `scripts/noexec` isn't executable",
         "error: /window/root/components/11/events/0/action/2/src: script `scripts/missing` doesn't exist",
         "error: actions.json:/update/ids/ghost: no component has id `ghost`",
-        "error: actions.json:/bogus: `bogus` is not a JSON action command",
+        "warning: actions.json:/bogus: `bogus` is not a JSON action command this version of alfrusco knows",
         "error: /window/root/components/11/events/0/action/5/src: JSON actions file `missing-actions.json`",
         "error: /window/root/components/11/events/0/action/6/src/update/ids/phantom: no component has id `phantom`",
         "error: /window/root/components/11/events/0/action/7/src: no component has id `ghostlist`",
@@ -417,7 +417,7 @@ fn simulator_follows_finish_out_of_the_ui() {
     let mut open = UiResponse::new();
     open.finish(Finish::new().arg("T-1").variable("outcome", "open"));
     assert_eq!(
-        sim.route_finish("UI-TASK", &open),
+        sim.route_response("UI-TASK", &open),
         ActionResult::OpenedUrl {
             url_template: "https://tasks.example.com/{query}".into()
         }
@@ -430,7 +430,7 @@ fn simulator_follows_finish_out_of_the_ui() {
             .variable("outcome", json!({ "dropped": "by Alfred" })),
     );
     assert_eq!(
-        sim.route_finish("UI-TASK", &other),
+        sim.route_response("UI-TASK", &other),
         ActionResult::RanScript {
             target_uid: "RUN-LOG".into()
         }
@@ -439,21 +439,36 @@ fn simulator_follows_finish_out_of_the_ui() {
     let mut external = UiResponse::new();
     external.finish(Finish::new().arg("T-1"));
     assert_eq!(
-        sim.route_finish("UI-EXTERNAL", &external),
+        sim.route_response("UI-EXTERNAL", &external),
         ActionResult::DeadEnd
     );
     assert_eq!(
-        sim.route_finish("UI-TASK", &UiResponse::new()),
+        sim.route_response("UI-TASK", &UiResponse::new()),
         ActionResult::DeadEnd
     );
-    assert_eq!(sim.route_finish("SF-TASKS", &open), ActionResult::DeadEnd);
+    assert_eq!(sim.route_response("SF-TASKS", &open), ActionResult::DeadEnd);
 
     let graph = WorkflowGraph::from_plist_file(task_workflow().join("info.plist")).unwrap();
     assert_eq!(
         graph.route_finish(
             "UI-TASK",
-            &json!({ "args": 7, "variables": { "outcome": "open" } })
+            &json!({ "finish": { "args": 7, "variables": { "outcome": "open" } } })
         ),
+        ActionResult::OpenedUrl {
+            url_template: "https://tasks.example.com/{query}".into()
+        }
+    );
+    // Whole JSON actions, as a script prints them or a ui.json `json` action
+    // holds them; no `finish` means no route.
+    assert_eq!(
+        sim.route_finish("UI-TASK", &json!({ "update": { "ids": {} } })),
+        ActionResult::DeadEnd
+    );
+    let package = task_package();
+    let open_button = &package.json()["window"]["root"]["components"][2]["components"][2];
+    assert_eq!(open_button["id"], "open");
+    assert_eq!(
+        sim.route_finish("UI-TASK", &open_button["events"][0]["action"]["src"]),
         ActionResult::OpenedUrl {
             url_template: "https://tasks.example.com/{query}".into()
         }
@@ -495,7 +510,7 @@ fn simulator_routes_results_into_the_ui_and_loads_its_package() {
         package.check_response(&response.to_json()),
         Vec::<Problem>::new()
     );
-    sim.route_finish("UI-TASK", &response).assert_opens_url();
+    sim.route_response("UI-TASK", &response).assert_opens_url();
     let _: Value = response.to_json();
 }
 
@@ -503,4 +518,45 @@ fn simulator_routes_results_into_the_ui_and_loads_its_package() {
 #[should_panic(expected = "expected OpenedUi")]
 fn assert_opens_ui_panics_on_other_results() {
     ActionResult::DeadEnd.assert_opens_ui();
+}
+
+#[test]
+fn unknown_commands_are_errors_only_when_they_look_like_typos() {
+    let found = check_actions(&json!({ "updat": {}, "notifcation": {}, "haptic": {} }));
+    let errors: Vec<&str> = found
+        .iter()
+        .filter(|p| p.is_error())
+        .map(|p| p.location.as_str())
+        .collect();
+    assert_eq!(errors, ["/notifcation", "/updat"]);
+    let warning = found.iter().find(|p| p.location == "/haptic").unwrap();
+    assert_eq!(warning.severity, Severity::Warning);
+    assert!(
+        found[1].message.contains("did you mean `update`?")
+            || found[2].message.contains("did you mean `update`?")
+    );
+}
+
+#[test]
+fn pulse_args_follow_the_pulse_rules() {
+    let found = messages(&check_actions(&json!({
+        "pulse": { "args": ["tick", "{var:n}", "{value:list.selected}", "n-{var:n}"] }
+    })));
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].starts_with("error: /pulse/args: pulse arg `{value:list.selected}`"));
+    assert!(found[1].starts_with("warning: /pulse/args: pulse arg `n-{var:n}`"));
+    assert_eq!(
+        check_actions(&json!({ "pulse": { "args": "{var:only}" } })),
+        Vec::<Problem>::new()
+    );
+
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(
+        dir.path().join("ui.json"),
+        r#"{ "pulse": { "args": "{data:uid}" }, "window": { "root": { "type": "label" } } }"#,
+    )
+    .unwrap();
+    let found = messages(&UiPackage::open(dir.path()).unwrap().problems());
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].starts_with("error: /pulse/args"));
 }

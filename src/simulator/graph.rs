@@ -106,6 +106,9 @@ impl ObjectNode {
 
     /// True for an Alfred UI object set to launch as a separate app
     /// (`launchmode` 1). Its `finish` output reaches no connected object.
+    ///
+    /// This reads the static `launchmode` in `info.plist`; a JSON utility can
+    /// override it per launch, which the simulator doesn't see.
     pub fn launches_externally(&self) -> bool {
         self.kind == ObjectKind::AlfredUi && self.config_integer("launchmode") == Some(1)
     }
@@ -746,22 +749,33 @@ impl WorkflowGraph {
             .map(|n| n.uid.as_str())
     }
 
-    /// Follows a `finish` JSON action from the Alfred UI object `ui_uid` to
-    /// the object it would reach, the way an actioned result is followed.
+    /// Follows the `finish` command in a set of JSON actions from the Alfred
+    /// UI object `ui_uid` to the object it would reach, the way an actioned
+    /// result is followed.
     ///
-    /// `finish` is the `finish` command's JSON, such as
-    /// `{"args": ["T-42"], "variables": {"mode": "edit"}}`. Conditionals see
+    /// `actions` is a whole JSON actions object, such as a script's output
+    /// (`ScriptRun::response`), [`UiResponse::to_json`](crate::ui::UiResponse::to_json)
+    /// or the `src` of a `json` action in ui.json:
+    /// `{"finish": {"args": ["T-42"], "variables": {"mode": "edit"}}}`.
+    /// Actions without `finish` give [`ActionResult::DeadEnd`]. Conditionals see
     /// the first arg as `{query}` and the string and number variables as
     /// `{var:name}`; Alfred drops object and array variables (observed on
     /// 6.0.3). How Alfred builds `{query}` from several args wasn't probed.
     /// An Alfred UI object that launches externally gives
     /// [`ActionResult::DeadEnd`]: Alfred 6.0.3 closes the window and runs
     /// nothing downstream.
-    pub fn route_finish(&self, ui_uid: &str, finish: &serde_json::Value) -> ActionResult {
+    ///
+    /// The launch mode is the static `launchmode` in `info.plist`. A workflow
+    /// can override it per launch (a JSON utility before the UI setting
+    /// `config.launchmode`); the simulator doesn't follow that.
+    pub fn route_finish(&self, ui_uid: &str, actions: &serde_json::Value) -> ActionResult {
         match self.objects.get(ui_uid) {
             Some(node) if node.kind == ObjectKind::AlfredUi && !node.launches_externally() => {}
             _ => return ActionResult::DeadEnd,
         }
+        let Some(finish) = actions.get("finish") else {
+            return ActionResult::DeadEnd;
+        };
         let arg = match finish.get("args") {
             Some(serde_json::Value::Array(args)) => args.first().cloned(),
             other => other.cloned(),

@@ -136,7 +136,8 @@
 //!
 //! So [`execute_ui`] always writes one JSON object: `{}` when there's
 //! nothing to do, and a notification when the backend returns an error or
-//! panics. It never exits non-zero. [`UiResponse::problems`] and
+//! panics. It never exits non-zero, unless the binary is built with
+//! `panic = "abort"`, which stops a panic from being caught. [`UiResponse::problems`] and
 //! [`check_actions`] flag unknown commands and the `finish` variable types
 //! Alfred drops, and [`execute_ui`] writes those problems to stderr, where
 //! Alfred's UI log shows them.
@@ -154,6 +155,10 @@
 //! - Whether Alfred kills a long synchronous script. Use `async: true` or the
 //!   pulse for slow work.
 //! - Non-ASCII and very large output, and the `stackview` launch option.
+//! - Whether the `notification` command, which [`execute_ui`]'s default
+//!   error response uses, delivers inside Alfred (launch mode 0) or from the
+//!   separate app an external launch runs (launch mode 1). Override
+//!   [`UiRunnable::error_response`] to also show errors in the UI itself.
 //!
 //! # Keeping up with Alfred
 //!
@@ -193,6 +198,8 @@ mod property;
 mod settings;
 mod window;
 
+/// How sure a [`Problem`] is that something breaks the UI.
+pub use crate::simulator::Severity;
 pub use backend::{
     execute_ui, execute_ui_async, is_unresolved_placeholder, AsyncUiRunnable, Invocation,
     UiContext, UiResponse, UiRunnable, SOURCE_VAR,
@@ -385,9 +392,11 @@ impl Serialize for Ui {
 /// Alfred preprocesses the JSON when it loads, replacing `var`, `constant`,
 /// `file`, `file_raw` and `param` everywhere except under `bundleid`,
 /// `variablesconfig`, `variables`, `args`, an action's `src`, and a
-/// dataview's `data.filter`. Those keys are resolved each time they're used,
-/// and they are the only places `value` and `data` work; `{var:}` there reads
-/// the variable's current value.
+/// dataview's `data.filter`. Of those, `args`, `variables` and an action's
+/// `src` are resolved each time they're used, and `data.filter` each time
+/// the dataview filters; they are the only places `value` and `data` work,
+/// and `{var:}` there reads the variable's current value. `bundleid` and
+/// `variablesconfig` aren't processed at all.
 ///
 /// In Alfred 6.0.3 (observed), a missing variable or component becomes an
 /// empty string with a warning in the UI log, while an unknown property of an

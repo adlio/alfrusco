@@ -121,8 +121,11 @@ impl fmt::Display for Problem {
 /// Checks a JSON actions object, such as a script's output, for what Alfred
 /// would silently ignore or drop.
 ///
-/// - A key that isn't a JSON action command is an error: Alfred ignores it
-///   without a warning, so a typo does nothing.
+/// - A key that isn't a JSON action command is ignored by Alfred without a
+///   warning. Within two edits of a known command (`updat`, `spek`) it's an
+///   error, since it's almost certainly a typo. Anything else is a warning,
+///   because it may be a command Alfred added after this version of alfrusco,
+///   written with `JsonAction::set`.
 /// - A top-level array is a warning: Alfred accepts it and does nothing.
 /// - `finish.variables` values that are objects or arrays are errors, because
 ///   Alfred drops them before the next object; booleans and `null` are
@@ -165,11 +168,7 @@ fn check_actions_at(actions: &Value, at: &str, problems: &mut Vec<Problem>) {
     for (key, value) in object {
         let here = format!("{at}/{key}");
         if !JSON_ACTION_COMMANDS.contains(&key.as_str()) {
-            problems.push(Problem::new(
-                Severity::Error,
-                &here,
-                format!("`{key}` is not a JSON action command; Alfred ignores it silently"),
-            ));
+            problems.push(unknown_command(key, &here));
             continue;
         }
         match key.as_str() {
@@ -185,20 +184,80 @@ fn check_actions_at(actions: &Value, at: &str, problems: &mut Vec<Problem>) {
                     ));
                 }
             }
-            "pulse" => check_pulse_interval(value, &here, problems),
+            "pulse" => check_pulse(value, &here, problems),
             "finish" => check_finish(value, &here, problems),
             _ => {}
         }
     }
 }
 
-fn check_pulse_interval(pulse: &Value, at: &str, problems: &mut Vec<Problem>) {
+/// An unknown JSON action key. A near-miss of a known command (edit distance
+/// 2 or less, such as `updat`) is an error, since it's almost certainly a
+/// typo. Anything else is a warning: it may be a command Alfred added after
+/// this version of alfrusco, sent with `JsonAction::set`.
+fn unknown_command(key: &str, at: &str) -> Problem {
+    let near = JSON_ACTION_COMMANDS
+        .iter()
+        .find(|command| edit_distance(key, command) <= 2);
+    match near {
+        Some(command) => Problem::new(
+            Severity::Error,
+            at,
+            format!("`{key}` is not a JSON action command (did you mean `{command}`?); Alfred ignores it silently"),
+        ),
+        None => Problem::new(
+            Severity::Warning,
+            at,
+            format!("`{key}` is not a JSON action command this version of alfrusco knows; Alfred ignores unknown keys silently"),
+        ),
+    }
+}
+
+/// Levenshtein distance, for spotting typos in short command names.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut previous: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut current = vec![i + 1];
+        for (j, cb) in b.iter().enumerate() {
+            let substitute = previous[j] + usize::from(ca != *cb);
+            current.push(substitute.min(previous[j + 1] + 1).min(current[j] + 1));
+        }
+        previous = current;
+    }
+    previous[b.len()]
+}
+
+fn check_pulse(pulse: &Value, at: &str, problems: &mut Vec<Problem>) {
     if let Some(interval) = pulse.get("interval").and_then(Value::as_f64) {
         if interval != 0.0 && !(0.1..=1000.0).contains(&interval) {
             problems.push(Problem::new(
                 Severity::Warning,
                 format!("{at}/interval"),
                 "the pulse interval must be 0 (off) or 0.1-1000 seconds; Alfred caps it",
+            ));
+        }
+    }
+    // Alfred's pulse docs: args are plain strings or whole-string `{var:}`
+    // placeholders; UI values and composite strings can't be used.
+    let args = match pulse.get("args") {
+        Some(Value::Array(args)) => args.iter().collect(),
+        Some(arg) => vec![arg],
+        None => Vec::new(),
+    };
+    for arg in args.into_iter().filter_map(Value::as_str) {
+        let here = format!("{at}/args");
+        if arg.contains("{value:") || arg.contains("{data:") {
+            problems.push(Problem::new(
+                Severity::Error,
+                here,
+                format!("pulse arg `{arg}` uses a UI value; the pulse can only use strings and `{{var:}}`"),
+            ));
+        } else if arg.contains("{var:") && whole_placeholder(arg, "var").is_none() {
+            problems.push(Problem::new(
+                Severity::Warning,
+                here,
+                format!("pulse arg `{arg}` mixes text and `{{var:}}`; Alfred's docs say the pulse can't use composite strings"),
             ));
         }
     }
@@ -350,6 +409,7 @@ impl UiPackage {
             if let Some(src) = pulse.get("src").and_then(Value::as_str) {
                 walker.check_script(src, "/pulse/src");
             }
+            check_pulse(pulse, "/pulse", walker.problems);
         }
         if let Some(icon) = root.get("iconpath").and_then(Value::as_str) {
             if !icon.contains('{') && !resolve(&self.dir, icon).exists() {
@@ -382,7 +442,8 @@ impl UiPackage {
     ///
     /// The script is exec'd directly with the `.alfredui` folder as its
     /// working directory and stdin at EOF. Its environment is only `PATH`,
-    /// `HOME`, `TMPDIR`, `USER`, `LOGNAME` and `LANG` from this process plus
+    /// `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `LANG` and `LC_CTYPE` from this
+    /// process plus
     /// `ctx`'s variables, so a script that depends on anything else fails
     /// here as it would for a user. Alfred's own process environment is
     /// larger; this is deliberately the smaller set.
@@ -394,7 +455,9 @@ impl UiPackage {
             .current_dir(&self.dir)
             .stdin(Stdio::null())
             .env_clear();
-        for key in ["PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "LANG"] {
+        for key in [
+            "PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "LANG", "LC_CTYPE",
+        ] {
             if let Ok(value) = std::env::var(key) {
                 command.env(key, value);
             }

@@ -300,7 +300,11 @@ impl Data {
 
 impl From<Data> for Value {
     fn from(data: Data) -> Self {
-        serde_json::to_value(data).unwrap_or(Value::Null)
+        // Serializing can't fail: every map key in the model is a string. The
+        // debug assertion catches a future type that breaks that.
+        let json = serde_json::to_value(data);
+        debug_assert!(json.is_ok(), "Data failed to serialize: {json:?}");
+        json.unwrap_or(Value::Null)
     }
 }
 

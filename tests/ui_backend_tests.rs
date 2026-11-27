@@ -408,3 +408,31 @@ async fn async_backend() {
         "Internal error: async bug"
     );
 }
+
+#[test]
+fn default_is_an_event_like_new() {
+    assert_eq!(UiContext::default(), UiContext::new());
+    assert_eq!(
+        UiContext::default().invocation(),
+        Invocation::Event { source: None }
+    );
+}
+
+#[test]
+fn with_workflow_sets_the_alfred_variables() {
+    let home = tempfile::tempdir().unwrap();
+    let ctx = UiContext::new().with_workflow(
+        "com.example.tasks",
+        home.path().join("data"),
+        home.path().join("cache"),
+    );
+    assert_eq!(ctx.bundle_id(), Some("com.example.tasks"));
+    assert_eq!(ctx.data_dir().unwrap(), home.path().join("data"));
+    assert_eq!(ctx.cache_dir().unwrap(), home.path().join("cache"));
+}
+
+#[test]
+fn severity_is_reachable_from_ui() {
+    let problem = &check_actions(&json!([]))[0];
+    assert_eq!(problem.severity, alfrusco::ui::Severity::Warning);
+}

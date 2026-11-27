@@ -456,9 +456,12 @@ fn main() {
 `UiContext` reads what Alfred 6 passes: the action's `args` as arguments,
 `variablesconfig` entries as environment variables, and `alfred_ui_source`
 (the component whose event fired; absent for the pulse). `execute_ui` always
-writes exactly one JSON object and never exits non-zero, because Alfred drops
+writes exactly one JSON object and never exits non-zero (except that a panic
+can't be caught in a binary built with `panic = "abort"`), because Alfred drops
 empty output, plain text and the output of a failed script without telling the
-user. An error or panic becomes a notification instead.
+user. An error or panic becomes a notification instead. Whether Alfred UI
+delivers notifications hasn't been confirmed yet, so override
+`UiRunnable::error_response` to show errors in the window as well.
 
 For tests:
 
@@ -467,13 +470,17 @@ For tests:
 - `UiPackage::open("tasks.alfredui")?.problems()` reports missing files and
   scripts, scripts without the exec bit, ids that actions and `{value:}`
   placeholders target but no component has, missing template parameters, and
-  unknown keys and types, all of which Alfred ignores silently.
+  unknown keys and types, all of which Alfred ignores silently. An unknown
+  JSON action command is an error when it's within two edits of a real one
+  (`updat`) and a warning otherwise, so a command added with `set` still
+  passes.
 - `package.run_script("scripts/backend", &ctx)` runs a script the way Alfred
   does (cwd = the `.alfredui` folder, stdin at EOF, only the given variables)
   and checks its output.
 - The simulator knows the Alfred UI object: results that open it route to
-  `ActionResult::OpenedUi`, and `Simulator::route_finish` follows a `finish`
-  to the next object. Alfred passes `finish` output on only when the UI opens
+  `ActionResult::OpenedUi`, and `Simulator::route_finish` (for JSON actions)
+  or `route_response` (for a `UiResponse`) follows a `finish` to the next
+  object. Alfred passes `finish` output on only when the UI opens
   inside Alfred (launch mode 0); the audit warns about connections from an
   externally launched UI.
 

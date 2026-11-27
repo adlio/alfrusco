@@ -154,21 +154,20 @@ impl Simulator {
             .objects()
             .get(ui_uid)
             .and_then(super::ObjectNode::alfred_ui_path)
-            .ok_or_else(|| {
-                SimulatorError::PlistParse(format!("{ui_uid} is not an Alfred UI object"))
-            })?;
+            .ok_or_else(|| SimulatorError::Io(format!("{ui_uid} is not an Alfred UI object")))?;
         UiPackage::open(self.workflow_dir.join(path)).map_err(|e| SimulatorError::Io(e.to_string()))
     }
 
-    /// Follows the `finish` command in `response` from the Alfred UI object
-    /// `ui_uid` to the object it reaches. See [`WorkflowGraph::route_finish`].
-    ///
-    /// A response without `finish` gives [`ActionResult::DeadEnd`].
-    pub fn route_finish(&self, ui_uid: &str, response: &UiResponse) -> ActionResult {
-        match response.to_json().get("finish") {
-            Some(finish) => self.graph.route_finish(ui_uid, finish),
-            None => ActionResult::DeadEnd,
-        }
+    /// Follows the `finish` command in a JSON actions object from the Alfred
+    /// UI object `ui_uid` to the object it reaches. See
+    /// [`WorkflowGraph::route_finish`].
+    pub fn route_finish(&self, ui_uid: &str, actions: &serde_json::Value) -> ActionResult {
+        self.graph.route_finish(ui_uid, actions)
+    }
+
+    /// [`Simulator::route_finish`] for a [`UiResponse`] built in-process.
+    pub fn route_response(&self, ui_uid: &str, response: &UiResponse) -> ActionResult {
+        self.route_finish(ui_uid, &response.to_json())
     }
 
     /// Runs a [`Runnable`] workflow in-process and returns the rendered [`Screen`].

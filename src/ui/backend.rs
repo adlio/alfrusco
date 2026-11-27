@@ -32,7 +32,12 @@ pub enum Invocation {
         /// The component id, from `alfred_ui_source`.
         source: Option<String>,
     },
-    /// The UI's pulse.
+    /// No `alfred_ui_source` variable, which is how Alfred runs the UI's
+    /// pulse.
+    ///
+    /// The variable is also absent when the same binary runs as a Script
+    /// Filter or Run Script, so a binary that serves several objects should
+    /// dispatch on its own argument or flag, not on this alone.
     Pulse,
 }
 
@@ -56,7 +61,7 @@ pub enum Invocation {
 /// assert_eq!(ctx.var("task_id"), Some("T-42"));
 /// assert_eq!(ctx.invocation(), Invocation::Event { source: Some("save_title".into()) });
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UiContext {
     args: Vec<String>,
     env: HashMap<String, String>,
@@ -67,16 +72,32 @@ impl UiContext {
     /// An event invocation from a component with no id, with no args and no
     /// variables.
     pub fn new() -> Self {
-        let mut ctx = Self::default();
-        ctx.env.insert(SOURCE_VAR.to_string(), String::new());
-        ctx
+        UiContext {
+            args: Vec::new(),
+            env: HashMap::from([(SOURCE_VAR.to_string(), String::new())]),
+            dir: None,
+        }
     }
 
     /// The arguments, environment and working directory of this process.
+    ///
+    /// Arguments and variables that aren't valid UTF-8 are converted lossily
+    /// instead of panicking, because a panic here would exit non-zero before
+    /// [`execute_ui`] can catch it.
     pub fn from_env() -> Self {
         UiContext {
-            args: std::env::args().skip(1).collect(),
-            env: std::env::vars().collect(),
+            args: std::env::args_os()
+                .skip(1)
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect(),
+            env: std::env::vars_os()
+                .map(|(key, value)| {
+                    (
+                        key.to_string_lossy().into_owned(),
+                        value.to_string_lossy().into_owned(),
+                    )
+                })
+                .collect(),
             dir: std::env::current_dir().ok(),
         }
     }
@@ -98,6 +119,26 @@ impl UiContext {
     pub fn with_var(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.env.insert(name.into(), value.into());
         self
+    }
+
+    /// Sets the `alfred_workflow_bundleid`, `alfred_workflow_data` and
+    /// `alfred_workflow_cache` variables Alfred passes, for tests of backends
+    /// that use [`UiContext::data_dir`] or [`UiContext::cache_dir`].
+    pub fn with_workflow(
+        self,
+        bundle_id: impl Into<String>,
+        data_dir: impl AsRef<Path>,
+        cache_dir: impl AsRef<Path>,
+    ) -> Self {
+        self.with_var("alfred_workflow_bundleid", bundle_id)
+            .with_var(
+                "alfred_workflow_data",
+                data_dir.as_ref().to_string_lossy().into_owned(),
+            )
+            .with_var(
+                "alfred_workflow_cache",
+                cache_dir.as_ref().to_string_lossy().into_owned(),
+            )
     }
 
     /// Marks this as an event from the component with id `id`.
@@ -264,6 +305,13 @@ impl UiContext {
     }
 }
 
+impl Default for UiContext {
+    /// The same as [`UiContext::new`]: an event from a component with no id.
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn parse_bool(value: &str) -> Option<bool> {
     match value {
         "1" | "true" => Some(true),
@@ -408,8 +456,11 @@ impl UiResponse {
 
     /// The response as JSON.
     pub fn to_json(&self) -> Value {
-        serde_json::to_value(&self.actions)
-            .unwrap_or_else(|_| Value::Object(serde_json::Map::new()))
+        // Serializing can't fail: every map key in the model is a string. The
+        // debug assertion catches a future type that breaks that.
+        let json = serde_json::to_value(&self.actions);
+        debug_assert!(json.is_ok(), "UiResponse failed to serialize: {json:?}");
+        json.unwrap_or_else(|_| Value::Object(serde_json::Map::new()))
     }
 
     /// Problems Alfred would not report: unknown commands it ignores, and
@@ -487,6 +538,10 @@ pub trait UiRunnable {
     /// The response written when `run` fails. Anything `run` added before it
     /// failed is discarded. The default posts a notification with the error,
     /// titled with the workflow name.
+    ///
+    /// Whether Alfred UI delivers notifications (inside Alfred and when
+    /// launched externally) hasn't been confirmed. Override this to also show
+    /// the error in the UI, for example by updating a status label.
     fn error_response(error: &Self::Error, ctx: &UiContext) -> UiResponse {
         failure_response(&error.to_string(), ctx)
     }
@@ -520,7 +575,8 @@ pub trait AsyncUiRunnable {
 /// Call it from `main` and return normally: a non-zero exit would make Alfred
 /// drop the output. Errors and panics become an error notification, the error
 /// is also written to stderr (which Alfred logs), and a response with nothing
-/// to do writes `{}`, because Alfred treats empty output as an error.
+/// to do writes `{}`, because Alfred treats empty output as an error. A panic
+/// can't be caught when the binary is built with `panic = "abort"`.
 ///
 /// ```no_run
 /// use alfrusco::ui::{execute_ui, UiContext, UiResponse, UiRunnable};

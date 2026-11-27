@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   arguments and `variablesconfig` environment Alfred 6 passes, tells an event
   (`alfred_ui_source`) from the pulse, parses `1`/`0` booleans and JSON args, spots
   placeholders Alfred left unresolved, and creates the workflow data and cache folders.
+  `UiContext::with_workflow` sets the `alfred_workflow_*` variables for tests.
   `UiResponse` builds `variables`, `update` (including dataview rows), `functions`,
   `notification`, `pulse` and `finish`. Output is always exactly one JSON object
   (`{}` when empty), and errors and panics become a notification instead of a non-zero
@@ -44,12 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Checks Alfred doesn't make.** `UiPackage` loads an `.alfredui` folder (inlining
   `{file:}` components) and reports missing files and scripts, scripts without the exec
   bit, ids targeted by actions and `{value:}` placeholders that no component has,
-  missing template parameters, and unknown keys, component types and action types.
+  missing template parameters, pulse args the pulse can't use, and unknown keys,
+  component types and action types. An unknown JSON action command is an error when
+  it's within two edits of a real one and a warning otherwise, so a newer command
+  written with `set` still passes. `ui::Severity` re-exports the problem severity.
   `check_actions` and `UiPackage::check_response` check a script's JSON actions, and
   `UiPackage::run_script` runs a script the way Alfred 6 does and checks its output.
 - **Simulator support for the Alfred UI object.** `ObjectKind::AlfredUi`,
   `ActionResult::OpenedUi`, `WorkflowGraph::route_finish` / `Simulator::route_finish`
-  to follow a `finish` to the next object, `Simulator::ui_package`, and an audit
+  (whole JSON actions) and `Simulator::route_response` (a `UiResponse`) to follow a
+  `finish` to the next object, `Simulator::ui_package`, and an audit
   warning for connections from an externally launched UI, which never run.
 
 ## [0.5.0] - 2026-11-26
