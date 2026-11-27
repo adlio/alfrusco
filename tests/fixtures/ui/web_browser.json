@@ -1,7 +1,7 @@
 {
   "bundleid": "com.example.browser",
   "variablesconfig": {
-    "url": { "default": "https://example.com", "src": "args[0]" }
+    "url": { "default": "https://example.com", "scriptenv": true, "src": "args[0]" }
   },
   "debug": { "reloadshortcut": "⌘⇧R" },
   "window": {

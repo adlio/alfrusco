@@ -8,24 +8,36 @@ use crate::Arg;
 /// How a variable behaves: its default, whether it persists or reaches
 /// scripts, and where its first value comes from.
 ///
+/// A new `VariableConfig` writes `"scriptenv": true`, so the variable reaches
+/// the environment of the UI's scripts and pulse. In Alfred 6.0.3 an entry
+/// reaches that environment exactly when its `scriptenv` key is present,
+/// whether it's `true` or `false`, and never when the key is missing
+/// (observed). [`VariableConfig::script_env`]`(false)` therefore leaves the
+/// key out.
+///
 /// ```
 /// use alfrusco::ui::{VariableConfig, VariableSource};
 ///
-/// let query = VariableConfig::new().src(VariableSource::Arg(0)).script_env(true);
+/// let query = VariableConfig::new().src(VariableSource::Arg(0));
 /// let theme = VariableConfig::new().default_value("light").persist(true);
-/// # let _ = (query, theme);
+/// let ui_only = VariableConfig::new().script_env(false);
+/// assert_eq!(serde_json::to_value(&query).unwrap()["scriptenv"], true);
+/// assert!(serde_json::to_value(&ui_only).unwrap().get("scriptenv").is_none());
+/// # let _ = theme;
 /// ```
 ///
 /// See <https://www.alfredapp.com/help/alfredui/variables/>
 #[non_exhaustive]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VariableConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     default: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     persist: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    scriptenv: Option<bool>,
+    /// Written as `"scriptenv": true` when set, and left out otherwise:
+    /// Alfred 6.0.3 passes an entry to scripts whenever the key is present.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    scriptenv: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     src: Option<VariableSource>,
     #[serde(flatten)]
@@ -33,10 +45,16 @@ pub struct VariableConfig {
 }
 
 impl VariableConfig {
-    /// Alfred's defaults: no default value, not persisted, and `scriptenv`
-    /// off.
+    /// A variable that reaches scripts (`"scriptenv": true`), with no default
+    /// value and not persisted.
     pub fn new() -> Self {
-        Self::default()
+        VariableConfig {
+            default: None,
+            persist: None,
+            scriptenv: true,
+            src: None,
+            extra: Map::new(),
+        }
     }
 
     /// The value used when the variable is null, and the baseline persistence
@@ -57,15 +75,16 @@ impl VariableConfig {
         self
     }
 
-    /// Alfred's docs say this passes the variable to the environment of action
-    /// scripts and the pulse.
+    /// Whether the variable reaches the environment of the UI's scripts and
+    /// pulse. On by default.
     ///
-    /// In Alfred 6.0.3 every `variablesconfig` key reaches the script
-    /// environment whatever this says (observed with `scriptenv: false`), so
-    /// don't rely on it either way. Variables not declared in
-    /// `variablesconfig` never reach the environment.
+    /// `true` writes `"scriptenv": true`. `false` leaves the key out, because
+    /// Alfred 6.0.3 passes an entry to scripts whenever `scriptenv` is present,
+    /// even as `false`, and never when it's missing (observed). Either way the
+    /// UI itself can read the variable as `{var:name}`. Variables not declared
+    /// in `variablesconfig` never reach the environment.
     pub fn script_env(mut self, script_env: bool) -> Self {
-        self.scriptenv = Some(script_env);
+        self.scriptenv = script_env;
         self
     }
 
@@ -76,6 +95,13 @@ impl VariableConfig {
     }
 
     extra_methods!();
+}
+
+impl Default for VariableConfig {
+    /// The same as [`VariableConfig::new`].
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Where a variable's first value comes from.

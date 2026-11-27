@@ -22,16 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filter and `modify` edits), webkitview, template and file. Events and triggers,
   `confirm` dialogs, actions (`log`, `script`, `json`, `function`, with `args`,
   `variables`, `flattenarrayargs` and `async`) and every JSON action command are
-  modelled too, along with `Colour` (hex, `rgb()`, `hsv()`, named colours, light/dark
-  pairs and `null`), `Font`, `Image`, menus, shortcuts and `Placeholder` helpers such as
+  modelled too, along with `Colour` (hex, `rgb()`, `hsv()`, named colours and `null`),
+  `Font`, `Image`, menus, shortcuts and `Placeholder` helpers such as
   `Placeholder::value("search", "text")` for `{value:search.text}`.
 - Every `ui` struct is `#[non_exhaustive]` and has a `set(key, value)` escape hatch that
   replaces the typed key of the same name, and `Component::raw` takes any JSON, so
   properties Alfred adds or renames can be used before the crate models them.
 - Action and `finish` arguments and `variablesconfig` defaults take any JSON value, as
   Alfred 6.0.3 does. Doc comments record what Alfred 6.0.3 was observed to do where it
-  differs from Alfred's docs: every `variablesconfig` key reaches scripts whatever
-  `scriptenv` says, and `finish` passes output on only when the UI opens inside Alfred.
+  differs from Alfred's docs: a `variablesconfig` entry reaches scripts when it has a
+  `scriptenv` key, `true` or `false` alike, and never without one, and `finish` passes
+  output on only when the UI opens inside Alfred.
+- `VariableConfig::new()` writes `"scriptenv": true`, so declared variables reach the
+  UI's scripts; `script_env(false)` leaves the key out, the only way Alfred 6.0.3 keeps
+  an entry out of the scripts' environment.
 - **Alfred UI script backends.** `UiRunnable` / `AsyncUiRunnable` with `execute_ui` /
   `execute_ui_async` run a UI's `script` actions and pulse. `UiContext` reads the
   arguments and `variablesconfig` environment Alfred 6 passes, tells an event
@@ -51,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   written with `set` still passes. `ui::Severity` re-exports the problem severity.
   `check_actions` and `UiPackage::check_response` check a script's JSON actions, and
   `UiPackage::run_script` runs a script the way Alfred 6 does and checks its output.
+  Both it and `UiPackage::run_in_process` pass a script only the variables Alfred
+  would (`alfred_*` and `variablesconfig` entries with `scriptenv`, via
+  `UiPackage::alfred_context`) and report any other variable the test set, and
+  `UiPackage::problems` warns about entries without `scriptenv` in a UI with scripts.
 - **Simulator support for the Alfred UI object.** `ObjectKind::AlfredUi`,
   `ActionResult::OpenedUi`, `WorkflowGraph::route_finish` / `Simulator::route_finish`
   (whole JSON actions) and `Simulator::route_response` (a `UiResponse`) to follow a

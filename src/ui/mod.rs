@@ -122,13 +122,18 @@
 //!   (see [`is_unresolved_placeholder`] and [`UiContext::resolved_arg`]).
 //! - The environment holds Alfred's process environment, the usual `alfred_*`
 //!   variables (`alfred_workflow_data` and `alfred_workflow_cache` are named
-//!   but not created; [`UiContext::data_dir`] creates them), every
-//!   `variablesconfig` entry stringified like args, and `alfred_ui_source`,
-//!   the id of the component whose event fired. The pulse gets no
+//!   but not created; [`UiContext::data_dir`] creates them), the
+//!   `variablesconfig` entries that have a `scriptenv` key (stringified like
+//!   args), and `alfred_ui_source`, the id of the component whose event
+//!   fired. An entry reaches the environment when its `scriptenv` key is
+//!   present, `true` or `false`, and never when the key is missing;
+//!   [`VariableConfig::new`] writes `"scriptenv": true`. The pulse gets no
 //!   `alfred_ui_source`, which is how [`UiContext::invocation`] tells them
 //!   apart. Nothing else reaches the environment: not ui.json `variables`,
 //!   not action `variables`, and not variables a script set, unless
-//!   `variablesconfig` declares them.
+//!   `variablesconfig` declares them with `scriptenv`.
+//!   [`UiPackage::run_script`] and [`UiPackage::run_in_process`] apply this
+//!   rule, so a test sees the environment Alfred would give.
 //! - Stdout must be exactly one JSON value. Empty output, plain text, two
 //!   JSON documents, or a non-zero exit make Alfred log an error and drop the
 //!   output, and the user sees nothing. stderr lines are logged and never
@@ -305,7 +310,7 @@ impl Ui {
     /// Sets a variable's value at start-up, readable as `{var:name}`.
     ///
     /// Not in a script's environment: pass it with `{var:name}` in args, or
-    /// declare it with [`Ui::variable_config`].
+    /// declare it with [`Ui::variable_config`], which writes `scriptenv`.
     pub fn variable(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.variables.insert(name.into(), value.into());
         self

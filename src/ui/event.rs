@@ -271,7 +271,8 @@ impl Action {
     /// placeholders, resolved when the action runs.
     ///
     /// Not in a script's environment: pass it with `{var:name}` in args, or
-    /// declare it with [`Ui::variable_config`](super::Ui::variable_config).
+    /// declare it with [`Ui::variable_config`](super::Ui::variable_config),
+    /// which writes `scriptenv`.
     pub fn variable(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.variables.insert(name.into(), value.into());
         self

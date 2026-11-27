@@ -40,10 +40,6 @@ fn colours_cover_every_format() {
     );
     assert_eq!(to_json(Colour::none()), Value::Null);
 
-    let adaptive = Colour::light_dark("#ffffff", Colour::named("systemGrayColor"));
-    let expected = json!({ "light": "#ffffff", "dark": "systemGrayColor" });
-    assert_eq!(to_json(&adaptive), expected);
-    assert_eq!(Value::from(adaptive), expected);
     assert_eq!(Value::from(Colour::none()), Value::Null);
     assert_eq!(Value::from(Colour::new("red")), json!("red"));
 }
@@ -961,7 +957,7 @@ fn top_level_settings() {
         json,
         json!({
             "variablesconfig": {
-                "all": { "src": "args" },
+                "all": { "scriptenv": true, "src": "args" },
                 "token": { "persist": true, "scriptenv": true, "src": "variable", "secret": true }
             },
             "variables": { "count": 0, "filters": { "mode": "append" } },
@@ -1063,19 +1059,23 @@ fn typed_args_and_defaults() {
     let defaults = [
         (
             VariableConfig::new().default_value(0),
-            json!({ "default": 0 }),
+            json!({ "default": 0, "scriptenv": true }),
         ),
         (
             VariableConfig::new().default_value(true),
-            json!({ "default": true }),
+            json!({ "default": true, "scriptenv": true }),
         ),
         (
             VariableConfig::new().default_value(json!({ "k": [1, 2] })),
-            json!({ "default": { "k": [1, 2] } }),
+            json!({ "default": { "k": [1, 2] }, "scriptenv": true }),
         ),
         (
-            VariableConfig::new().default_value("light"),
-            json!({ "default": "light" }),
+            VariableConfig::new().default_value("ui").script_env(false),
+            json!({ "default": "ui" }),
+        ),
+        (
+            VariableConfig::default().default_value("light"),
+            json!({ "default": "light", "scriptenv": true }),
         ),
     ];
     for (config, expected) in defaults {

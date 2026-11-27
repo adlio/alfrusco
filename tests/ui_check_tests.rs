@@ -560,3 +560,127 @@ fn pulse_args_follow_the_pulse_rules() {
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(found[0].starts_with("error: /pulse/args"));
 }
+
+/// A package whose `variablesconfig` has one entry of each kind Alfred 6.0.3
+/// was observed to treat differently.
+#[cfg(unix)]
+fn env_rule_package(dir: &Path) -> UiPackage {
+    write_script(
+        dir,
+        "dump",
+        r#"printf '{"variables":{"with":"%s","without":"%s","off":"%s","stray":"%s"}}\n' "${with-ABSENT}" "${without-ABSENT}" "${off-ABSENT}" "${stray-ABSENT}""#,
+    );
+    fs::write(
+        dir.join("ui.json"),
+        serde_json::to_string(&json!({
+            "variablesconfig": {
+                "with": { "default": "a", "scriptenv": true },
+                "without": { "default": "b" },
+                "off": { "default": "c", "scriptenv": false }
+            },
+            "window": { "root": { "type": "label", "id": "status", "events": [
+                { "triggers": "launched", "action": { "type": "script", "src": "dump" } }
+            ] } }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    UiPackage::open(dir).unwrap()
+}
+
+#[cfg(unix)]
+#[test]
+fn run_script_passes_only_what_alfred_passes() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = env_rule_package(dir.path());
+    assert_eq!(
+        package.script_env_vars().into_iter().collect::<Vec<_>>(),
+        ["off", "with"],
+        "an entry is passed when its scriptenv key is present, even as false"
+    );
+
+    let ctx = UiContext::new()
+        .with_var("with", "1")
+        .with_var("without", "2")
+        .with_var("off", "3")
+        .with_var("stray", "4")
+        .with_var("alfred_workflow_bundleid", "com.example.env");
+    let run = package.run_script("dump", &ctx);
+    assert_eq!(
+        run.response.as_ref().unwrap()["variables"],
+        json!({ "with": "1", "without": "ABSENT", "off": "3", "stray": "ABSENT" })
+    );
+    let found = messages(&run.problems);
+    assert_eq!(found.len(), 2, "{found:#?}");
+    assert!(found[0].starts_with("error: env/stray: `stray` isn't a `variablesconfig` entry"));
+    assert!(
+        found[1].starts_with("error: /variablesconfig/without: `without` has no `scriptenv` key")
+    );
+    assert!(!run.is_ok());
+
+    let clean = package.run_script("dump", &UiContext::new().with_var("with", "x"));
+    assert!(clean.is_ok(), "{clean:#?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn problems_warn_about_entries_scripts_cannot_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = env_rule_package(dir.path());
+    let found = messages(&package.problems());
+    assert_eq!(
+        found,
+        ["warning: /variablesconfig/without: `without` has no `scriptenv` key, so Alfred 6.0.3 keeps it out of the scripts' environment; add `\"scriptenv\": true` if a script reads it"]
+    );
+
+    // Without any script, a UI-only variable is fine.
+    let ui_only = tempfile::tempdir().unwrap();
+    fs::write(
+        ui_only.path().join("ui.json"),
+        r#"{ "variablesconfig": { "theme": { "default": "light" } }, "window": { "root": { "type": "label" } } }"#,
+    )
+    .unwrap();
+    assert_eq!(
+        UiPackage::open(ui_only.path()).unwrap().problems(),
+        Vec::<Problem>::new()
+    );
+}
+
+#[test]
+fn run_in_process_applies_the_same_rule() {
+    struct Echo;
+    impl UiRunnable for Echo {
+        type Error = alfrusco::Error;
+        fn run(self, ctx: &UiContext, response: &mut UiResponse) -> Result<(), Self::Error> {
+            let seen = ["task_id", "token", "stray"]
+                .map(|name| format!("{name}={}", ctx.var(name).unwrap_or("ABSENT")));
+            response.update("status", "text", seen.join(" "));
+            Ok(())
+        }
+    }
+    let package = task_package();
+    let ctx = UiContext::new()
+        .with_var("task_id", "T-3")
+        .with_var("stray", "x");
+    let run = package.run_in_process(&ctx, Echo);
+    assert_eq!(run.exit_code, Some(0));
+    assert_eq!(
+        run.response.as_ref().unwrap()["update"]["ids"]["status"]["text"],
+        "task_id=T-3 token=ABSENT stray=ABSENT"
+    );
+    assert_eq!(
+        run.stdout.trim(),
+        run.response.as_ref().unwrap().to_string()
+    );
+    let found = messages(&run.problems);
+    assert_eq!(found.len(), 1, "{found:#?}");
+    assert!(found[0].starts_with("error: env/stray"));
+
+    // The plain in-process run passes everything, which is why the package
+    // runs exist.
+    let raw = ctx.run(Echo).to_json();
+    assert_eq!(
+        raw["update"]["ids"]["status"]["text"],
+        "task_id=T-3 token=ABSENT stray=x"
+    );
+}

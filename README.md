@@ -455,7 +455,10 @@ fn main() {
 
 `UiContext` reads what Alfred 6 passes: the action's `args` as arguments,
 `variablesconfig` entries as environment variables, and `alfred_ui_source`
-(the component whose event fired; absent for the pulse). `execute_ui` always
+(the component whose event fired; absent for the pulse). Alfred 6.0.3 passes a
+`variablesconfig` entry only when it has a `scriptenv` key (`true` or `false`
+alike), so `VariableConfig::new()` writes `"scriptenv": true`; a hand-written
+entry without the key never reaches the script. `execute_ui` always
 writes exactly one JSON object and never exits non-zero (except that a panic
 can't be caught in a binary built with `panic = "abort"`), because Alfred drops
 empty output, plain text and the output of a failed script without telling the
@@ -466,7 +469,9 @@ delivers notifications hasn't been confirmed yet, so override
 For tests:
 
 - `UiContext::new().with_arg(..).with_var(..).run(backend)` runs a backend
-  in-process and returns its `UiResponse`.
+  in-process and returns its `UiResponse`, with every variable you set.
+  `package.run_in_process(&ctx, backend)` runs it with only the variables
+  Alfred would pass, and reports the ones it drops.
 - `UiPackage::open("tasks.alfredui")?.problems()` reports missing files and
   scripts, scripts without the exec bit, ids that actions and `{value:}`
   placeholders target but no component has, missing template parameters, and
@@ -475,8 +480,10 @@ For tests:
   (`updat`) and a warning otherwise, so a command added with `set` still
   passes.
 - `package.run_script("scripts/backend", &ctx)` runs a script the way Alfred
-  does (cwd = the `.alfredui` folder, stdin at EOF, only the given variables)
-  and checks its output.
+  does (cwd = the `.alfredui` folder, stdin at EOF, and only the `alfred_*`
+  variables and `variablesconfig` entries with `scriptenv` that `ctx` sets)
+  and checks its output. A variable Alfred wouldn't pass is reported as a
+  problem instead of reaching the script.
 - The simulator knows the Alfred UI object: results that open it route to
   `ActionResult::OpenedUi`, and `Simulator::route_finish` (for JSON actions)
   or `route_response` (for a `UiResponse`) follows a `finish` to the next
