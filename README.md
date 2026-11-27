@@ -20,6 +20,7 @@ A Rust library for building [Alfred](https://www.alfredapp.com/) workflows. It h
 - URL items with clipboard modifiers
 - Typed output for the Script Filter, Grid View, Text View and Run Script / JSON Utility
 - Alfred 6 Script Filter keys (`strictmods`, `iconresize`, icon `resize`)
+- Typed builders for Alfred 6 Alfred UI `ui.json` files (`alfrusco::ui`)
 - Testing utilities
 
 ## Installation
@@ -382,6 +383,48 @@ output
     .var("fruit", "banana");
 output.write(std::io::stdout())?;
 ```
+
+### Alfred UI (`ui.json`)
+
+Alfred 6 can show native windows described by a `ui.json` file inside a
+`.alfredui` folder, opened by the Alfred UI workflow object. The `alfrusco::ui`
+module builds that file from typed Rust: windows, layouts, every component,
+events, actions, JSON action commands, colours and placeholders.
+
+```rust
+use alfrusco::ui::*;
+
+let search = TextField::new()
+    .id("query")
+    .placeholder("Search fruit")
+    .focus(true)
+    .region(Region::Top)
+    .on(Trigger::Changed, Action::function("fruit", function::FILTER_DATA))
+    .on(
+        Trigger::Actioned,
+        JsonAction::new().finish(Finish::new().args(Placeholder::value("fruit", "selected.name.text"))),
+    );
+
+let fruit = DataView::new(
+    Cell::new(Label::empty().id("name"))
+        .height(28)
+        .selected("name", "colour", Colour::alfred_selected_result_text()),
+    Data::rows(["Apple", "Banana", "Cherry"].map(|name| Row::new().value("name", "text", name)))
+        .filter(Filter::new("name.text", Placeholder::value("query", "text"))),
+)
+.id("fruit")
+.region(Region::Centre);
+
+let ui = Ui::new(Window::new(View::border().spacing(8).child(search).child(fruit)).padding(8));
+std::fs::create_dir_all("fruit.alfredui")?;
+ui.write_pretty(std::fs::File::create("fruit.alfredui/ui.json")?)?;
+```
+
+The model only serializes; it doesn't run the UI or answer its events. Alfred
+UI still renames properties between builds, so every struct has a
+`set(key, value)` escape hatch that writes any key as is (replacing the typed
+property of the same name), and `Component::raw(json)` accepts a component this
+crate doesn't model yet.
 
 ### Filtering and Sorting
 
@@ -752,6 +795,13 @@ cargo run --example static_output
 ### `JsonConfig`
 
 - `arg(value)` / `config(key, value)` / `var(key, value)` / `write(writer)` - Run Script / JSON Utility output
+
+### `ui`
+
+- `Ui::new(Window)` with `bundle_id`, `variable`, `variable_config`, `template`, `colour`, `pulse`, `log`, `debug`, `write` / `write_pretty`
+- `View` (`stack`, `border`, `grid`, `inline`, `form`, `flex`) and the components `Label`, `Button`, `Checkbox`, `Picker`, `TextField`, `PasswordField`, `TextArea`, `MarkdownArea`, `Progress`, `ImageView`, `DataView`, `WebKitView`, `Template`, `FileComponent`
+- `Event`, `Trigger`, `Action` (`log`, `script`, `json`, `function`) and the `JsonAction` commands (`update`, `insert`, `remove`, `replace`, `sheet`, `finish` and the rest)
+- `Colour`, `Font`, `Image`, `Constraints`, `Placeholder`
 
 ### Traits
 

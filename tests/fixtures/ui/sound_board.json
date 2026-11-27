@@ -1,0 +1,68 @@
+{
+  "bundleid": "com.example.soundboard",
+  "templates": {
+    "soundbutton": {
+      "type": "button",
+      "text": "{param:sound}",
+      "events": [
+        {
+          "triggers": "actioned",
+          "action": { "type": "json", "src": { "sound": { "src": "{param:sound}" } } }
+        }
+      ],
+      "menu": [
+        {
+          "text": "Say the name",
+          "action": { "type": "json", "src": { "speak": { "text": "{param:sound}" } } }
+        }
+      ]
+    }
+  },
+  "window": {
+    "title": "Sound Board",
+    "size": { "height": 320 },
+    "padding": 10,
+    "root": {
+      "type": "view",
+      "layout": "border",
+      "spacing": 8,
+      "shortcuts": [
+        {
+          "shortcut": "⌘1",
+          "action": { "type": "json", "src": { "sound": { "src": "Basso" } } }
+        }
+      ],
+      "components": [
+        {
+          "type": "label",
+          "constraints": { "region": "top" },
+          "text": "Click a sound",
+          "font": { "size": "large", "weight": "semibold" },
+          "textalign": "centre"
+        },
+        {
+          "type": "view",
+          "constraints": { "region": "centre" },
+          "layout": "grid",
+          "rows": 3,
+          "cols": 4,
+          "spacing": 6,
+          "components": [
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Basso" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Blow" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Bottle" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Frog" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Funk" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Glass" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Hero" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Morse" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Ping" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Pop" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Purr" } },
+            { "type": "template", "src": "soundbutton", "params": { "sound": "Tink" } }
+          ]
+        }
+      ]
+    }
+  }
+}

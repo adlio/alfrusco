@@ -1,0 +1,129 @@
+{
+  "window": {
+    "title": "Text to Markdown",
+    "padding": 12,
+    "root": {
+      "type": "view",
+      "layout": "border",
+      "spacing": 8,
+      "components": [
+        {
+          "type": "view",
+          "constraints": { "region": "top" },
+          "layout": "form",
+          "spacing": 6,
+          "components": [
+            {
+              "type": "label",
+              "constraints": { "position": "right" },
+              "text": "Mode:"
+            },
+            {
+              "type": "picker",
+              "id": "mode",
+              "selected": "replace",
+              "items": [
+                { "text": "Replace", "value": "replace" },
+                { "text": "Append", "value": "append" },
+                { "text": "Prepend", "value": "prepend" },
+                { "text": "Replace last", "value": "replacelast" }
+              ]
+            },
+            { "type": "view" },
+            {
+              "type": "checkbox",
+              "id": "clear",
+              "text": "Clear the input after rendering",
+              "checked": true
+            }
+          ]
+        },
+        {
+          "type": "view",
+          "constraints": { "region": "centre" },
+          "layout": "grid",
+          "rows": 1,
+          "cols": 2,
+          "spacing": 8,
+          "components": [
+            {
+              "type": "view",
+              "layout": "border",
+              "spacing": 4,
+              "components": [
+                { "type": "label", "constraints": { "region": "top" }, "text": "Text" },
+                {
+                  "type": "textarea",
+                  "id": "input",
+                  "constraints": {
+                    "region": "centre",
+                    "size": { "width": 280, "height": 240 }
+                  },
+                  "focus": true,
+                  "disableallsubstitutions": true
+                }
+              ]
+            },
+            {
+              "type": "view",
+              "layout": "border",
+              "spacing": 4,
+              "components": [
+                { "type": "label", "constraints": { "region": "top" }, "text": "Markdown" },
+                {
+                  "type": "markdownarea",
+                  "id": "preview",
+                  "constraints": { "region": "centre" },
+                  "behaviour": { "scroll": "auto" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "view",
+          "constraints": { "region": "bottom" },
+          "layout": "inline",
+          "direction": "horizontal",
+          "spacing": 8,
+          "components": [
+            {
+              "type": "button",
+              "text": "Render",
+              "shortcut": "⌘↩",
+              "tooltip": "Render the text ⌘↩",
+              "events": [
+                {
+                  "triggers": "actioned",
+                  "action": {
+                    "type": "json",
+                    "src": {
+                      "variables": {
+                        "source": "{value:input.text}",
+                        "mode": "{value:mode.selected.value}"
+                      },
+                      "update": {
+                        "ids": {
+                          "preview": {
+                            "text": "{var:source}",
+                            "behaviour": { "mode": "{var:mode}" }
+                          },
+                          "input": { "text": "" }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "template",
+              "src": "components/copybutton.json",
+              "params": { "target": "preview" }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

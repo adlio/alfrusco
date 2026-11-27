@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`alfrusco::ui`, typed builders for Alfred UI `ui.json` files** (Alfred 6). It covers
+  the top level (`bundleid`, `window`, `variables`, `variablesconfig`, `templates`,
+  `colours`, `pulse`, `log`, `debug`, `iconpath`), `Window` and its toolbar, `View` with
+  the stack, border, grid, inline, form and flex layouts and component `Constraints`,
+  and every documented component: label, button, checkbox, picker, textfield,
+  passwordfield, textarea, markdownarea, progress, imageview, dataview (cell, rows,
+  filter and `modify` edits), webkitview, template and file. Events and triggers,
+  `confirm` dialogs, actions (`log`, `script`, `json`, `function`, with `args`,
+  `variables`, `flattenarrayargs` and `async`) and every JSON action command are
+  modelled too, along with `Colour` (hex, `rgb()`, `hsv()`, named colours, light/dark
+  pairs and `null`), `Font`, `Image`, menus, shortcuts and `Placeholder` helpers such as
+  `Placeholder::value("search", "text")` for `{value:search.text}`.
+- Every `ui` struct is `#[non_exhaustive]` and has a `set(key, value)` escape hatch that
+  replaces the typed key of the same name, and `Component::raw` takes any JSON, so
+  properties Alfred adds or renames can be used before the crate models them.
+- Action and `finish` arguments and `variablesconfig` defaults take any JSON value, as
+  Alfred 6.0.3 does. Doc comments record what Alfred 6.0.3 was observed to do where it
+  differs from Alfred's docs: every `variablesconfig` key reaches scripts whatever
+  `scriptenv` says, and `finish` passes output on only when the UI opens inside Alfred.
+
 ## [0.5.0] - 2026-11-26
 
 ### Breaking
