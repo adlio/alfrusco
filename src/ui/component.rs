@@ -157,7 +157,9 @@ pub struct View {
 }
 
 impl View {
-    /// A view with no layout set, which Alfred treats as a stack layout.
+    /// A view with no layout set. Alfred uses a stack layout and, in 6.0.3,
+    /// logs a warning ("No layout defined for view"), so prefer
+    /// [`View::stack`] or another layout.
     pub fn new() -> Self {
         Self::default()
     }

@@ -29,7 +29,7 @@
                 { "text": "Replace last", "value": "replacelast" }
               ]
             },
-            { "type": "view" },
+            { "type": "view", "layout": "stack" },
             {
               "type": "checkbox",
               "id": "clear",

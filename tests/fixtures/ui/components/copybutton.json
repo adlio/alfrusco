@@ -1,0 +1,14 @@
+{
+  "type": "button",
+  "text": "Copy",
+  "events": [
+    {
+      "triggers": "actioned",
+      "action": {
+        "type": "json",
+        "variables": { "copied": "{value:{param:target}.text}" },
+        "src": { "copy": { "type": "text", "src": "{var:copied}" } }
+      }
+    }
+  ]
+}

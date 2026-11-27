@@ -15,6 +15,12 @@ fn fixture(name: &str) -> Value {
 }
 
 fn assert_golden(ui: &Ui, name: &str) {
+    // Every golden must load on its own: the files it names exist in
+    // tests/fixtures/ui/, and the checks find nothing.
+    let dir = format!("{}/tests/fixtures/ui", env!("CARGO_MANIFEST_DIR"));
+    let problems = UiPackage::from_ui(&dir, ui).problems();
+    assert!(problems.is_empty(), "{name}: {problems:#?}");
+
     let mut bytes = Vec::new();
     ui.write_pretty(&mut bytes).unwrap();
     let actual: Value = serde_json::from_slice(&bytes).unwrap();
@@ -171,10 +177,8 @@ fn colour_search() {
     }
     let root = root.child(search).child(swatch_grid);
 
-    let ui = Ui::new(Window::new(root).size(Size::with_height(560)).padding(8)).colour(
-        "panel",
-        Colour::light_dark(Colour::hex("f4f1ea"), Colour::rgb(30, 30, 34)),
-    );
+    let ui = Ui::new(Window::new(root).size(Size::with_height(560)).padding(8))
+        .colour("panel", Colour::hex("f4f1ea"));
 
     assert_golden(&ui, "colour_search");
 }
@@ -199,7 +203,7 @@ fn text_to_markdown_form() {
         .region(Region::Top)
         .child(Label::new("Mode:").constraints(Constraints::new().position(Position::Right)))
         .child(mode_picker)
-        .child(View::new())
+        .child(View::stack())
         .child(
             Checkbox::new("Clear the input after rendering")
                 .id("clear")

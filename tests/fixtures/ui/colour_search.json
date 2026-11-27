@@ -1,6 +1,6 @@
 {
   "colours": {
-    "panel": { "light": "#f4f1ea", "dark": "rgb(30, 30, 34)" }
+    "panel": "#f4f1ea"
   },
   "window": {
     "size": { "height": 560 },

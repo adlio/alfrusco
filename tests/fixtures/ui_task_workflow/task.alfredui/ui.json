@@ -1,8 +1,8 @@
 {
   "bundleid": "com.example.tasks",
   "variablesconfig": {
-    "task_id": { "src": "args[0]" },
-    "token": { "default": "" }
+    "task_id": { "src": "args[0]", "scriptenv": true },
+    "token": { "default": "", "scriptenv": true }
   },
   "pulse": { "src": "scripts/backend", "args": ["tick"], "interval": 30 },
   "window": {

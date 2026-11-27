@@ -116,6 +116,12 @@ impl UiContext {
 
     /// Sets an environment variable, such as a `variablesconfig` entry or an
     /// `alfred_*` value.
+    ///
+    /// [`UiContext::run`] passes every variable set here. Alfred passes only
+    /// `variablesconfig` entries that have a `scriptenv` key, so test through
+    /// [`UiPackage::run_in_process`](super::UiPackage::run_in_process) or
+    /// [`UiPackage::run_script`](super::UiPackage::run_script) to apply that
+    /// rule.
     pub fn with_var(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.env.insert(name.into(), value.into());
         self
@@ -265,6 +271,20 @@ impl UiContext {
     /// The variables passed to a subprocess, for [`UiPackage::run_script`](super::UiPackage::run_script).
     pub(crate) fn env(&self) -> &HashMap<String, String> {
         &self.env
+    }
+
+    /// This context with only the variables `keep` accepts.
+    pub(crate) fn retain_env(&self, keep: impl Fn(&str) -> bool) -> Self {
+        UiContext {
+            args: self.args.clone(),
+            env: self
+                .env
+                .iter()
+                .filter(|(key, _)| keep(key))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+            dir: self.dir.clone(),
+        }
     }
 
     /// Runs `runnable` in-process and returns the response it would write,

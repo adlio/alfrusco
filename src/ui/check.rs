@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde_json::{Map, Value};
 
-use super::{Ui, UiContext};
+use super::{Ui, UiContext, UiRunnable};
 use crate::simulator::Severity;
 use crate::{Error, Result};
 
@@ -68,6 +68,11 @@ const COMPONENT_TYPES: &[&str] = &[
 ];
 
 const ACTION_TYPES: &[&str] = &["log", "script", "json", "function"];
+
+/// Variables of Alfred's own process environment that a script also gets.
+const PROCESS_VARS: &[&str] = &[
+    "PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "LANG", "LC_CTYPE",
+];
 
 static VALUE_PLACEHOLDER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{value:([^.}]+)[.}]").expect("valid regex"));
@@ -403,8 +408,10 @@ impl UiPackage {
             templates,
             problems: &mut problems,
             open_templates: Vec::new(),
+            saw_script: false,
         };
         walker.walk(&self.json, "", Context::Other);
+        let has_scripts = walker.saw_script || root.get("pulse").is_some();
         if let Some(pulse) = root.get("pulse") {
             if let Some(src) = pulse.get("src").and_then(Value::as_str) {
                 walker.check_script(src, "/pulse/src");
@@ -418,6 +425,18 @@ impl UiPackage {
                     "/iconpath",
                     format!("icon `{icon}` doesn't exist"),
                 ));
+            }
+        }
+        if has_scripts {
+            let passed = self.script_env_vars();
+            if let Some(config) = root.get("variablesconfig").and_then(Value::as_object) {
+                for name in config.keys().filter(|name| !passed.contains(*name)) {
+                    problems.push(Problem::new(
+                        Severity::Warning,
+                        format!("/variablesconfig/{name}"),
+                        format!("`{name}` has no `scriptenv` key, so Alfred 6.0.3 keeps it out of the scripts' environment; add `\"scriptenv\": true` if a script reads it"),
+                    ));
+                }
             }
         }
         problems
@@ -436,18 +455,92 @@ impl UiPackage {
         problems
     }
 
+    /// The `variablesconfig` entries Alfred 6.0.3 passes to scripts: those
+    /// with a `scriptenv` key, `true` or `false` alike.
+    pub fn script_env_vars(&self) -> BTreeSet<String> {
+        self.json
+            .get("variablesconfig")
+            .and_then(Value::as_object)
+            .map_or_else(BTreeSet::new, |config| {
+                config
+                    .iter()
+                    .filter(|(_, entry)| entry.get("scriptenv").is_some())
+                    .map(|(name, _)| name.clone())
+                    .collect()
+            })
+    }
+
+    /// `ctx` reduced to what Alfred 6.0.3 would give one of this UI's
+    /// scripts, with a problem for every variable it drops.
+    ///
+    /// It keeps `alfred_*` variables (including `alfred_ui_source`), the
+    /// process variables `PATH`, `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `LANG`
+    /// and `LC_CTYPE`, and the `variablesconfig` entries that have a
+    /// `scriptenv` key. Any other variable set on `ctx` is an error: the test
+    /// would see a value the script never gets in Alfred.
+    pub fn alfred_context(&self, ctx: &UiContext) -> (UiContext, Vec<Problem>) {
+        let passed = self.script_env_vars();
+        let declared: BTreeSet<String> = self
+            .json
+            .get("variablesconfig")
+            .and_then(Value::as_object)
+            .map_or_else(BTreeSet::new, |config| config.keys().cloned().collect());
+        let keep = |key: &str| {
+            key.starts_with("alfred_") || PROCESS_VARS.contains(&key) || passed.contains(key)
+        };
+        let mut dropped: Vec<&String> = ctx.env().keys().filter(|key| !keep(key)).collect();
+        dropped.sort();
+        let problems = dropped
+            .into_iter()
+            .map(|key| {
+                if declared.contains(key) {
+                    Problem::new(
+                        Severity::Error,
+                        format!("/variablesconfig/{key}"),
+                        format!("`{key}` has no `scriptenv` key, so Alfred 6.0.3 doesn't pass it to scripts; add `\"scriptenv\": true`"),
+                    )
+                } else {
+                    Problem::new(
+                        Severity::Error,
+                        format!("env/{key}"),
+                        format!("`{key}` isn't a `variablesconfig` entry, so Alfred wouldn't pass it to scripts; declare it with `scriptenv`"),
+                    )
+                }
+            })
+            .collect();
+        (ctx.retain_env(keep), problems)
+    }
+
+    /// Runs `runnable` in-process as one of this UI's scripts, with the
+    /// environment Alfred would give it ([`UiPackage::alfred_context`]), and
+    /// checks its response against the UI.
+    pub fn run_in_process<R: UiRunnable>(&self, ctx: &UiContext, runnable: R) -> ScriptRun {
+        let (ctx, mut problems) = self.alfred_context(ctx);
+        let response = ctx.run(runnable).to_json();
+        problems.extend(self.check_response(&response));
+        ScriptRun {
+            exit_code: Some(0),
+            stdout: format!("{response}\n"),
+            stderr: String::new(),
+            response: Some(response),
+            problems,
+        }
+    }
+
     /// Runs the script `src` (relative to the `.alfredui` folder) the way
     /// Alfred 6 does, with `ctx`'s arguments and variables, and checks what it
     /// writes.
     ///
     /// The script is exec'd directly with the `.alfredui` folder as its
-    /// working directory and stdin at EOF. Its environment is only `PATH`,
-    /// `HOME`, `TMPDIR`, `USER`, `LOGNAME`, `LANG` and `LC_CTYPE` from this
-    /// process plus
-    /// `ctx`'s variables, so a script that depends on anything else fails
-    /// here as it would for a user. Alfred's own process environment is
-    /// larger; this is deliberately the smaller set.
+    /// working directory and stdin at EOF. Its environment follows Alfred's
+    /// rule ([`UiPackage::alfred_context`]): `PATH`, `HOME`, `TMPDIR`, `USER`,
+    /// `LOGNAME`, `LANG` and `LC_CTYPE` from this process, `ctx`'s `alfred_*`
+    /// variables, and `ctx`'s values for `variablesconfig` entries with a
+    /// `scriptenv` key. Other variables `ctx` sets aren't passed and are
+    /// reported as problems. Alfred's own process environment is larger; this
+    /// is deliberately the smaller set.
     pub fn run_script(&self, src: &str, ctx: &UiContext) -> ScriptRun {
+        let (ctx, env_problems) = self.alfred_context(ctx);
         let path = resolve(&self.dir, src);
         let mut command = Command::new(&path);
         command
@@ -455,9 +548,7 @@ impl UiPackage {
             .current_dir(&self.dir)
             .stdin(Stdio::null())
             .env_clear();
-        for key in [
-            "PATH", "HOME", "TMPDIR", "USER", "LOGNAME", "LANG", "LC_CTYPE",
-        ] {
+        for key in PROCESS_VARS {
             if let Ok(value) = std::env::var(key) {
                 command.env(key, value);
             }
@@ -472,17 +563,20 @@ impl UiPackage {
                     stdout: String::new(),
                     stderr: String::new(),
                     response: None,
-                    problems: vec![Problem::new(
+                    problems: env_problems
+                        .into_iter()
+                        .chain([Problem::new(
                         Severity::Error,
                         src,
                         format!("script launch failed ({error}); Alfred would log the error and skip it"),
-                    )],
+                    )])
+                        .collect(),
                 };
             }
         };
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-        let mut problems = Vec::new();
+        let mut problems = env_problems;
         let response = match serde_json::from_str::<Value>(&stdout) {
             Ok(value) => Some(value),
             Err(error) => {
@@ -733,6 +827,8 @@ struct Walker<'a> {
     problems: &'a mut Vec<Problem>,
     /// Template files being checked, to stop a template that uses itself.
     open_templates: Vec<String>,
+    /// Whether any `script` action was found.
+    saw_script: bool,
 }
 
 impl Walker<'_> {
@@ -904,6 +1000,7 @@ impl Walker<'_> {
     }
 
     fn check_script(&mut self, src: &str, at: &str) {
+        self.saw_script = true;
         if src.contains('{') {
             return;
         }

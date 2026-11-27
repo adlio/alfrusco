@@ -100,9 +100,15 @@ pub(crate) fn push_arg(args: &mut Option<Value>, arg: Value) {
     });
 }
 
-/// A colour value: hex, `rgb()`, `hsv()`, a macOS system colour name, a
-/// colour constant from [`Ui::colour`](super::Ui::colour), or a pair of colours
-/// for light and dark mode.
+/// A colour value: hex, `rgb()`, `hsv()`, a macOS system colour name, or a
+/// colour constant from [`Ui::colour`](super::Ui::colour).
+///
+/// For a colour that changes with light and dark mode, use a macOS adaptive
+/// colour name such as `"labelColor"`, `"windowBackgroundColor"` or
+/// `"systemBlueColor"`. Alfred's change log mentions a `{"light": ..., "dark":
+/// ...}` colour object, but Alfred 6.0.3 rejected it as a colour constant
+/// (`Unable to add colour '(null)'`), so this crate has no builder for it; send
+/// one with `set` if you want to try it on a component.
 ///
 /// ```
 /// use alfrusco::ui::Colour;
@@ -110,12 +116,7 @@ pub(crate) fn push_arg(args: &mut Option<Value>, arg: Value) {
 /// let accent = Colour::named("systemOrangeColor");
 /// let swatch = Colour::hex("#ffe135");
 /// let shade = Colour::rgba(0, 0, 255, 0.3);
-/// let adaptive = Colour::light_dark(Colour::hex("#222222"), Colour::hex("#eeeeee"));
 /// assert_eq!(serde_json::to_value(&swatch).unwrap(), "#ffe135");
-/// assert_eq!(
-///     serde_json::to_value(&adaptive).unwrap(),
-///     serde_json::json!({ "light": "#222222", "dark": "#eeeeee" })
-/// );
 /// # let _ = (accent, shade);
 /// ```
 ///
@@ -127,10 +128,6 @@ pub struct Colour(ColourValue);
 #[serde(untagged)]
 enum ColourValue {
     Text(String),
-    Adaptive {
-        light: Box<Colour>,
-        dark: Box<Colour>,
-    },
     Null,
 }
 
@@ -186,14 +183,6 @@ impl Colour {
         Self::new("alfredSelectedResultBackgroundColor")
     }
 
-    /// One colour in light mode and another in dark mode.
-    pub fn light_dark(light: impl Into<Colour>, dark: impl Into<Colour>) -> Self {
-        Colour(ColourValue::Adaptive {
-            light: Box::new(light.into()),
-            dark: Box::new(dark.into()),
-        })
-    }
-
     /// JSON `null`: removes a background or border, or restores the default
     /// text or tint colour. Mostly useful in dataview cell `init` and in
     /// `update` actions.
@@ -218,12 +207,6 @@ impl From<Colour> for Value {
     fn from(colour: Colour) -> Self {
         match colour.0 {
             ColourValue::Text(text) => Value::String(text),
-            ColourValue::Adaptive { light, dark } => {
-                let mut map = Map::new();
-                map.insert("light".into(), (*light).into());
-                map.insert("dark".into(), (*dark).into());
-                Value::Object(map)
-            }
             ColourValue::Null => Value::Null,
         }
     }
