@@ -169,3 +169,104 @@ fn parses_source_output_uid_from_connections() {
         .unwrap();
     assert_eq!(loopback_conn.destination_uid, "SF-SUB-001");
 }
+
+// --- `{var:name}` conditions ---
+
+/// The conditional fixture with its conditions switched from `{query}` to
+/// `{var:route}`, so routing depends on a variable instead of the item's arg.
+fn var_routed_graph(dir: &std::path::Path) -> WorkflowGraph {
+    let plist = std::fs::read_to_string("tests/fixtures/menu_conditional_workflow/info.plist")
+        .unwrap()
+        .replace(
+            "<key>inputstring</key>\n\t\t\t\t\t\t<string>{query}</string>",
+            "<key>inputstring</key>\n\t\t\t\t\t\t<string>{var:route}</string>",
+        );
+    assert_eq!(plist.matches("{var:route}").count(), 2);
+    let path = dir.join("info.plist");
+    std::fs::write(&path, plist).unwrap();
+    WorkflowGraph::from_plist_file(&path).unwrap()
+}
+
+fn resolve_json(graph: &WorkflowGraph, json: &str) -> ActionResult {
+    use alfrusco::simulator::Screen;
+    Screen::from_json(json)
+        .unwrap()
+        .with_context(Arc::new(graph.clone()), "SF-MAIN-001".to_string())
+        .action(0)
+        .unwrap()
+}
+
+#[test]
+fn conditional_reads_session_variable() {
+    let dir = tempfile::tempdir().unwrap();
+    let graph = var_routed_graph(dir.path());
+    let result = resolve_json(
+        &graph,
+        r#"{"variables":{"route":"loopback"},"items":[{"title":"Test","arg":"run"}]}"#,
+    );
+    assert_eq!(result.assert_drills_in(), "SF-SUB-001");
+}
+
+#[test]
+fn conditional_item_variable_overrides_session_variable() {
+    let dir = tempfile::tempdir().unwrap();
+    let graph = var_routed_graph(dir.path());
+    let result = resolve_json(
+        &graph,
+        r#"{"variables":{"route":"loopback"},
+            "items":[{"title":"Test","arg":"run","variables":{"route":"https://example.com"}}]}"#,
+    );
+    assert_eq!(result.assert_opens_url(), "{query}");
+}
+
+#[test]
+fn conditional_without_the_variable_takes_else_branch() {
+    let dir = tempfile::tempdir().unwrap();
+    let graph = var_routed_graph(dir.path());
+    let result = resolve_json(&graph, r#"{"items":[{"title":"Test","arg":"loopback"}]}"#);
+    result.assert_runs_script();
+}
+
+#[test]
+fn modified_selection_resolves_variables_before_routing() {
+    use alfrusco::simulator::Screen;
+    let dir = tempfile::tempdir().unwrap();
+    let graph = var_routed_graph(dir.path());
+    let screen = Screen::from_json(
+        r#"{
+        "strictmods":true,"variables":{"route":"loopback"},
+        "items":[{"title":"Test","arg":"run","variables":{"route":"https://example.com"},
+        "mods":{"shift+cmd":{"variables":{}},"alt":{},"fn":{"variables":{"route":"run"}},
+        "ctrl":{"valid":false,"autocomplete":"retry"},"unknown":{}}}]}"#,
+    )
+    .unwrap()
+    .with_context(Arc::new(graph), "SF-MAIN-001".into());
+    let action = |mask| screen.action_with_modifiers(0, mask).unwrap();
+    action(0).assert_opens_url();
+    action(1 << 19).assert_opens_url();
+    action((1 << 17) | (1 << 20)).assert_drills_in();
+    action(1 << 23).assert_runs_script();
+    assert_eq!(action(1 << 18).assert_autocompletes(), "retry");
+    assert!(action(1 << 20).is_dead_end());
+}
+
+#[test]
+fn modifier_arg_replaces_query_and_unassigned_keys_use_default() {
+    use alfrusco::simulator::Screen;
+    let graph =
+        WorkflowGraph::from_plist_file("tests/fixtures/menu_conditional_workflow/info.plist")
+            .unwrap();
+    let screen = Screen::from_json(
+        r#"{"items":[{"title":"Test","arg":"run","mods":{"cmd":{"arg":"loopback"}}}]}"#,
+    )
+    .unwrap()
+    .with_context(Arc::new(graph), "SF-MAIN-001".into());
+    screen
+        .action_with_modifiers(0, 1 << 20)
+        .unwrap()
+        .assert_drills_in();
+    screen
+        .action_with_modifiers(0, 1 << 19)
+        .unwrap()
+        .assert_runs_script();
+}

@@ -19,6 +19,7 @@ const VAR_THEME: &str = "alfred_theme";
 const VAR_THEME_BACKGROUND: &str = "alfred_theme_background";
 const VAR_THEME_SELECTION_BACKGROUND: &str = "alfred_theme_selection_background";
 const VAR_THEME_SUBTEXT: &str = "alfred_theme_subtext";
+const VAR_THEME_WINDOW_WIDTH: &str = "alfred_theme_window_width";
 const VAR_WORKFLOW_DESCRIPTION: &str = "alfred_workflow_description";
 const VAR_WORKFLOW_UID: &str = "alfred_workflow_uid";
 const VAR_WORKFLOW_KEYWORD: &str = "alfred_workflow_keyword";
@@ -92,6 +93,7 @@ fn test_alfred_env_provider_with_all_optional_vars() {
                 Some("rgba(255,255,255,0.98)"),
             ),
             (VAR_THEME_SUBTEXT, Some("3")),
+            (VAR_THEME_WINDOW_WIDTH, Some("700")),
             (VAR_WORKFLOW_DESCRIPTION, Some("Test Description")),
             (VAR_WORKFLOW_UID, Some("test.uid")),
             (VAR_WORKFLOW_KEYWORD, Some("test")),
@@ -124,6 +126,7 @@ fn test_alfred_env_provider_with_all_optional_vars() {
                 Some("rgba(255,255,255,0.98)".to_string())
             );
             assert_eq!(config.theme_subtext, Some("3".to_string()));
+            assert_eq!(config.theme_window_width, Some("700".to_string()));
             assert_eq!(
                 config.workflow_description,
                 Some("Test Description".to_string())
@@ -191,4 +194,24 @@ fn test_workflow_config_clone() {
     assert_eq!(config.version_build, cloned_config.version_build);
     assert_eq!(config.workflow_name, cloned_config.workflow_name);
     assert_eq!(config.debug, cloned_config.debug);
+}
+
+#[test]
+fn missing_bundle_id_does_not_hide_alfred_version_or_theme_width() {
+    temp_env::with_vars(
+        [
+            (VAR_WORKFLOW_BUNDLEID, None),
+            (VAR_WORKFLOW_CACHE, None),
+            (VAR_WORKFLOW_DATA, None),
+            (VAR_VERSION, Some("6.0.3")),
+            (VAR_VERSION_BUILD, Some("3000")),
+            (VAR_THEME_WINDOW_WIDTH, Some("720")),
+        ],
+        || {
+            let config = AlfredEnvProvider.config().unwrap();
+            assert_eq!(config.alfred_major_version(), Some(6));
+            assert_eq!(config.version_build, "3000");
+            assert_eq!(config.theme_window_width.as_deref(), Some("720"));
+        },
+    );
 }

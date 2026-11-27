@@ -9,6 +9,7 @@ const VAR_THEME: &str = "alfred_theme";
 const VAR_THEME_BACKGROUND: &str = "alfred_theme_background";
 const VAR_THEME_SELECTION_BACKGROUND: &str = "alfred_theme_selection_background";
 const VAR_THEME_SUBTEXT: &str = "alfred_theme_subtext";
+const VAR_THEME_WINDOW_WIDTH: &str = "alfred_theme_window_width";
 const VAR_VERSION: &str = "alfred_version";
 const VAR_VERSION_BUILD: &str = "alfred_version_build";
 const VAR_WORKFLOW_BUNDLEID: &str = "alfred_workflow_bundleid";
@@ -27,7 +28,7 @@ pub(crate) const DEFAULT_ALFRED_VERSION_BUILD: &str = "2300";
 /// `WorkflowConfig` holds the configuration values for the current workflow.
 ///
 /// In a real-world scenario, these values are read from environment variables.
-/// The `from_env()` constructor is the primary way to create a `WorkflowConfig`.
+/// Use [`AlfredEnvProvider`] to read the current workflow's configuration.
 ///
 /// See <https://www.alfredapp.com/help/workflows/script-environment-variables/>
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -46,10 +47,24 @@ pub struct WorkflowConfig {
     pub theme_background: Option<String>,
     pub theme_selection_background: Option<String>,
     pub theme_subtext: Option<String>,
+    pub theme_window_width: Option<String>,
     pub workflow_description: Option<String>,
     pub workflow_uid: Option<String>,
     pub workflow_keyword: Option<String>,
     pub debug: bool,
+}
+
+impl WorkflowConfig {
+    /// The major version of the running Alfred (for example `6` for
+    /// `6.0.3`). Returns `None` if the part before the first dot cannot be
+    /// parsed as an unsigned integer.
+    ///
+    /// Use it to emit Alfred 6 keys only when Alfred 6 is running. When no
+    /// Alfred environment is present, the version is alfrusco's fallback
+    /// default, not a detected value.
+    pub fn alfred_major_version(&self) -> Option<u32> {
+        self.version.split('.').next()?.trim().parse().ok()
+    }
 }
 
 /// `ConfigProvider` provides a strategy pattern solution for providing
@@ -81,12 +96,20 @@ impl ConfigProvider for AlfredEnvProvider {
         }
 
         // Tier 2: Try inferring from binary location (deployed workflow directory)
-        if let Some(config) = try_infer_from_binary(debug) {
-            return Ok(config);
+        let mut fallback = match try_infer_from_binary(debug) {
+            Some(config) => config,
+            None => temp_fallback_config(debug),
+        };
+        // Alfred omits workflow directories when no bundle ID is configured.
+        // Falling back for paths must not change the detected host version.
+        if let Ok(version) = env::var(VAR_VERSION) {
+            fallback.version = version;
         }
-
-        // Tier 3: Temp directory fallback
-        Ok(temp_fallback_config(debug))
+        if let Ok(build) = env::var(VAR_VERSION_BUILD) {
+            fallback.version_build = build;
+        }
+        fallback.theme_window_width = env::var(VAR_THEME_WINDOW_WIDTH).ok();
+        Ok(fallback)
     }
 }
 
@@ -107,6 +130,7 @@ fn try_env_config(debug: bool) -> Option<WorkflowConfig> {
         theme_background: env::var(VAR_THEME_BACKGROUND).ok(),
         theme_selection_background: env::var(VAR_THEME_SELECTION_BACKGROUND).ok(),
         theme_subtext: env::var(VAR_THEME_SUBTEXT).ok(),
+        theme_window_width: env::var(VAR_THEME_WINDOW_WIDTH).ok(),
         workflow_description: env::var(VAR_WORKFLOW_DESCRIPTION).ok(),
         workflow_uid: env::var(VAR_WORKFLOW_UID).ok(),
         workflow_keyword: env::var(VAR_WORKFLOW_KEYWORD).ok(),
@@ -137,6 +161,7 @@ fn try_infer_from_binary(debug: bool) -> Option<WorkflowConfig> {
         theme_background: None,
         theme_selection_background: None,
         theme_subtext: None,
+        theme_window_width: None,
         workflow_description: None,
         workflow_uid: None,
         workflow_keyword: None,
@@ -177,6 +202,7 @@ fn temp_fallback_config(debug: bool) -> WorkflowConfig {
         theme_background: None,
         theme_selection_background: None,
         theme_subtext: None,
+        theme_window_width: None,
         workflow_description: None,
         workflow_uid: None,
         workflow_keyword: None,
@@ -275,6 +301,7 @@ impl ConfigProvider for TestingProvider {
             theme_background: Some("rgba(255,255,255,0.98)".to_string()),
             theme_selection_background: Some("rgba(255,255,255,0.98)".to_string()),
             theme_subtext: Some("3".to_string()),
+            theme_window_width: None,
             version: "5.0".to_string(),
             version_build: "2058".to_string(),
             workflow_bundleid: "com.alfredapp.googlesuggest".to_string(),
@@ -294,8 +321,22 @@ impl ConfigProvider for TestingProvider {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    #[test]
+    fn test_alfred_major_version() {
+        let mut config = temp_fallback_config(false);
+        for (version, expected) in [
+            ("6.0.3", Some(6)),
+            ("5.5", Some(5)),
+            ("6", Some(6)),
+            ("", None),
+            ("beta", None),
+        ] {
+            config.version = version.to_string();
+            assert_eq!(config.alfred_major_version(), expected, "{version}");
+        }
+    }
 
     #[test]
     fn test_alfred_env_provider_with_all_env_vars() {

@@ -54,7 +54,10 @@ the workflow has a filter keyword set, items are fuzzy-matched and sorted before
   clipboard operations. Converts to `Item` via `From`.
 - `Workflow` — Holds config and the response being built. Methods: `append_item()`, `prepend_item()`,
   `set_filter_keyword()`, `cache()`, `rerun()`, `data_dir()`, `cache_dir()`.
-- `Response` — The complete Alfred JSON output. Contains items plus control fields (rerun interval, cache settings).
+- `Response` — The complete Alfred JSON output. Contains items plus control fields (rerun interval, cache settings,
+  session variables, Grid View `preselect`, Alfred 6 `strictmods` / `iconresize`).
+- `TextView` / `JsonConfig` — Standalone outputs for the Text View and for Run Script / JSON Utility
+  (`alfredworkflow`) JSON. They have their own `write()` and don't go through `execute`.
 - `BackgroundJob` — Runs shell commands without blocking Alfred's UI. Tracks execution status (
   Fresh/Stale/Running/Failed) with automatic retry.
 

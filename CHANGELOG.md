@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Alfred 6 Script Filter keys.** `Response::strict_mods` / `Workflow::strict_mods` write
+  `strictmods`, so modifier combinations an item doesn't define act as `valid: false`.
+  `Response::icon_resize` / `Workflow::icon_resize` write `iconresize`, and `Icon::resize`
+  writes the per-icon `resize`, both taking the new `IconResize` enum (`Fit`, `Fill`,
+  `Stretch`, `Centre`).
+- **Item `type`.** `Item::item_type` with the new `ItemType` enum (`Default`, `File`,
+  `FileSkipCheck`) marks an `arg` as a file path, so Universal Actions, the File Buffer and
+  Quick Look work on it.
+- **Universal Actions.** `Item::action` sets values whose type Alfred infers;
+  `Item::universal_action` takes the new `UniversalAction` builder with explicit `text`,
+  `url`, `file` and `auto` values.
+- **Session variables.** `Response::var` / `Response::unset_var` / `Workflow::var` write
+  the top-level `variables` object. The simulator follows them too: a Conditional that
+  tests `{var:name}` reads the session variable when the actioned item doesn't set `name`.
+- **Grid View `preselect`.** `Response::preselect` / `Workflow::preselect`.
+- **Icon constructors.** `Icon::from_image`, `Icon::for_file` (`fileicon`) and
+  `Icon::for_filetype`, plus `icon_for_file` on `Item`, `Modifier` and `URLItem`.
+- **`TextView`** for scripts that populate Alfred's Text View: `response`, `footer`,
+  `actionoutput`, `behaviour` (`TextViewMode`, `ScrollMode`, `InputFieldMode`), `rerun` and
+  session `variables`.
+- **`JsonConfig`** for the `alfredworkflow` JSON a Run Script action or JSON Utility writes:
+  `arg`, `config` overrides and `variables`.
+- **`WorkflowConfig::alfred_major_version()`** and the `theme_window_width` field
+  (`alfred_theme_window_width`).
+- `Arg` now converts from `&str`, `String`, `Vec<_>` and arrays.
+
+### Changed
+- **Breaking:** `WorkflowConfig` has a new public field, `theme_window_width`, so code that
+  builds it with a struct literal must add the field.
+- `AsyncRunnable` allows clippy's `double_must_use`, which `#[async_trait]` triggers on
+  Rust 1.99, and two simulator expressions are rewritten to pass Rust 1.100's
+  `map_unwrap_or` lint while still building on 1.99. No behavior change.
+
+### Fixed
+- The simulator uses the selected modifier's argument, variables and validity when routing a
+  result. An undefined combination with `strictmods` set behaves like `valid: false`.
+- Cache TTLs are written as whole seconds. Fractional rerun intervals retain sub-millisecond
+  precision in Script Filter and Text View output.
+- Missing workflow directories no longer hide the running Alfred version, build or theme width.
+
 ## [0.4.5] - 2026-11-01
 
 ### Changed

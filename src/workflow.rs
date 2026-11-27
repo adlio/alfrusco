@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::config::{ConfigProvider, WorkflowConfig};
 use crate::error::Result;
+use crate::icon::IconResize;
 use crate::internal_handlers::handle;
 use crate::item::Item;
 use crate::response::Response;
@@ -73,6 +74,29 @@ impl Workflow {
 
     pub fn rerun(&mut self, interval: std::time::Duration) {
         self.response.rerun(interval);
+    }
+
+    /// Sets a session variable on the response. See [`Response::var`].
+    pub fn var(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.response.var(key, value);
+    }
+
+    /// Grid View only: highlights the item with this `uid` when the view
+    /// opens. See [`Response::preselect`].
+    pub fn preselect(&mut self, uid: impl Into<String>) {
+        self.response.preselect(uid);
+    }
+
+    /// Alfred 6: treats modifier combinations an item doesn't define as
+    /// `valid: false`. See [`Response::strict_mods`].
+    pub fn strict_mods(&mut self, strict: bool) {
+        self.response.strict_mods(strict);
+    }
+
+    /// Alfred 6: sets how every result's icon fills its space. See
+    /// [`Response::icon_resize`].
+    pub fn icon_resize(&mut self, resize: IconResize) {
+        self.response.icon_resize(resize);
     }
 
     pub fn data_dir(&self) -> PathBuf {

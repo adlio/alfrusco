@@ -13,6 +13,7 @@ pub fn create_test_workflow(temp_path: &Path) -> Workflow {
         theme_background: Some("rgba(255,255,255,0.98)".to_string()),
         theme_selection_background: Some("rgba(255,255,255,0.98)".to_string()),
         theme_subtext: Some("3".to_string()),
+        theme_window_width: None,
         version: "5.0".to_string(),
         version_build: "2058".to_string(),
         workflow_bundleid: "com.test.workflow".to_string(),

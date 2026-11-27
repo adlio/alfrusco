@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-pub use crate::{Arg, Icon, Modifier, Text};
+use crate::action::ItemAction;
+pub use crate::{Arg, Icon, ItemType, Modifier, Text, UniversalAction};
 
 /// Slight boost to fuzzy match score (+25 points).
 /// Use when you want a subtle preference for an item.
@@ -78,6 +79,12 @@ pub struct Item {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) text: Option<Text>,
 
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub(crate) kind: Option<ItemType>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) action: Option<ItemAction>,
+
     #[serde(skip_serializing)]
     pub(crate) sticky: bool,
 
@@ -143,18 +150,18 @@ impl Item {
     }
 
     pub fn icon_for_filetype(mut self, filetype: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: Some("filetype".to_string()),
-            path: filetype.into(),
-        });
+        self.icon = Some(Icon::for_filetype(filetype));
+        self
+    }
+
+    /// Uses the Finder icon of the file or folder at `path` (Alfred's `fileicon` type).
+    pub fn icon_for_file(mut self, path: impl Into<String>) -> Self {
+        self.icon = Some(Icon::for_file(path));
         self
     }
 
     pub fn icon_from_image(mut self, path_to_image: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: None,
-            path: path_to_image.into(),
-        });
+        self.icon = Some(Icon::from_image(path_to_image));
         self
     }
 
@@ -185,6 +192,29 @@ impl Item {
 
     pub fn large_type_text(mut self, text: impl Into<String>) -> Self {
         self.text.get_or_insert_with(Text::default).large_type = Some(text.into());
+        self
+    }
+
+    /// Sets how Alfred interprets this item's `arg`. Use [`ItemType::File`]
+    /// when the arg is a file path, so Universal Actions, the File Buffer and
+    /// Quick Look work on it.
+    pub fn item_type(mut self, item_type: ItemType) -> Self {
+        self.kind = Some(item_type);
+        self
+    }
+
+    /// Sets the content Universal Actions receive for this item, overriding
+    /// `arg`. Alfred infers whether each value is a file, URL or text. Pass a
+    /// string for one value, or a `Vec` or array for several.
+    pub fn action(mut self, value: impl Into<Arg>) -> Self {
+        self.action = Some(ItemAction::Inferred(value.into()));
+        self
+    }
+
+    /// Sets the content Universal Actions receive for this item, with an
+    /// explicit content type for each value. Overrides `arg`.
+    pub fn universal_action(mut self, action: UniversalAction) -> Self {
+        self.action = Some(ItemAction::Typed(action));
         self
     }
 
@@ -473,5 +503,55 @@ mod tests {
         let item = Item::new("Test Item").boost(100);
         let json_str = serde_json::to_string(&item).unwrap();
         assert!(!json_str.contains("boost"));
+    }
+
+    #[test]
+    fn test_item_type() {
+        let item = Item::new("Desktop")
+            .arg("~/Desktop")
+            .item_type(ItemType::File);
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["type"], "file");
+
+        let unset = serde_json::to_value(Item::new("Plain")).unwrap();
+        assert!(unset.get("type").is_none());
+    }
+
+    #[test]
+    fn test_inferred_action() {
+        let one = serde_json::to_value(Item::new("A").action("Alfred is Great")).unwrap();
+        assert_eq!(one["action"], json!("Alfred is Great"));
+
+        let many = serde_json::to_value(Item::new("B").action(vec!["Alfred is Great", "All day"]))
+            .unwrap();
+        assert_eq!(many["action"], json!(["Alfred is Great", "All day"]));
+    }
+
+    #[test]
+    fn test_universal_action() {
+        let item = Item::new("C").universal_action(
+            UniversalAction::new()
+                .url("https://www.alfredapp.com")
+                .file("~/Desktop"),
+        );
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            json["action"],
+            json!({"url": "https://www.alfredapp.com", "file": "~/Desktop"})
+        );
+    }
+
+    #[test]
+    fn test_icon_for_file_and_resize() {
+        let item = Item::new("D").icon_for_file("~/Desktop");
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            json["icon"],
+            json!({"type": "fileicon", "path": "~/Desktop"})
+        );
+
+        let item = Item::new("E").icon(Icon::from_image("./a.png").resize(crate::IconResize::Fill));
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["icon"], json!({"path": "./a.png", "resize": "fill"}));
     }
 }

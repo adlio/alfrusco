@@ -139,6 +139,9 @@ impl Screen {
     /// Alfred modifier bitmasks: Cmd=1048576, Alt=524288, Ctrl=262144,
     /// Shift=131072, Fn=8388608. Combine with bitwise OR.
     ///
+    /// Models a selection fully inside the results, where Alfred applies
+    /// `strictmods`. Modifier variables replace item variables; omitted
+    /// modifier variables inherit the item's. Session variables remain available.
     /// Returns `None` if this screen has no graph context.
     ///
     /// # Panics
@@ -147,19 +150,46 @@ impl Screen {
     pub fn action_with_modifiers(&self, index: usize, modifiers: u64) -> Option<ActionResult> {
         let ctx = self.context.as_ref()?;
         let item = &self.items[index];
+        let modifier = item.raw()["mods"].as_object().and_then(|mods| {
+            mods.iter()
+                .find(|(name, _)| modifier_mask(name) == Some(modifiers))
+                .map(|(_, value)| value)
+        });
+        let blocked = modifiers != 0 && modifier.is_none() && self.raw["strictmods"] == true;
+        let field = |name: &str| {
+            modifier
+                .and_then(|m| m.get(name))
+                .or_else(|| item.raw().get(name))
+        };
         let item_context = super::action::ItemContext {
-            arg: item.arg(),
-            variables: item.raw().get("variables"),
+            arg: field("arg").and_then(Value::as_str),
+            variables: field("variables"),
+            session_variables: self.raw.get("variables"),
         };
         Some(resolve_action(
             &ctx.graph,
             &ctx.source_uid,
-            item.is_valid(),
-            item.autocomplete(),
+            !blocked && field("valid").and_then(Value::as_bool).unwrap_or(true),
+            field("autocomplete").and_then(Value::as_str),
             &item_context,
             modifiers,
         ))
     }
+}
+
+fn modifier_mask(name: &str) -> Option<u64> {
+    name.split('+').try_fold(0, |mask, key| {
+        Some(
+            mask | match key {
+                "cmd" => 1 << 20,
+                "alt" => 1 << 19,
+                "ctrl" => 1 << 18,
+                "shift" => 1 << 17,
+                "fn" => 1 << 23,
+                _ => return None,
+            },
+        )
+    })
 }
 
 /// A single item in a rendered Alfred screen.

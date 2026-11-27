@@ -354,6 +354,10 @@ impl Simulator {
         if item.autocomplete().is_some() {
             return true;
         }
+        // An invalid item without autocomplete intentionally has no action.
+        if !item.is_valid() {
+            return false;
+        }
         // Variables are a navigation signal UNLESS the arg is a URL (leaf action)
         if let Some(vars) = item.raw().get("variables").and_then(|v| v.as_object()) {
             if !vars.is_empty() {
@@ -489,12 +493,15 @@ impl Simulator {
             return uid.clone();
         }
         // Default: first Script Filter with a keyword in the graph
-        self.graph
+        match self
+            .graph
             .objects()
             .values()
             .find(|n| n.kind == ObjectKind::ScriptFilter && n.keyword.is_some())
-            .map(|n| n.uid.clone())
-            .unwrap_or_default()
+        {
+            Some(n) => n.uid.clone(),
+            None => String::new(),
+        }
     }
 }
 
@@ -522,6 +529,7 @@ impl ConfigProvider for SimulatorConfigProvider {
             theme_background: None,
             theme_selection_background: None,
             theme_subtext: None,
+            theme_window_width: None,
             workflow_description: None,
             workflow_uid: None,
             workflow_keyword: None,
@@ -587,4 +595,22 @@ pub struct DynamicAuditDiagnostic {
     pub keyword: String,
     /// The title of the misrouted item, if applicable.
     pub item_title: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audit_ignores_disabled_rows_unless_they_autocomplete() {
+        let screen = Screen::from_json(
+            r#"{"items":[
+            {"title":"Status","valid":false,"variables":{"page":"1"}},
+            {"title":"Next","valid":false,"autocomplete":"next"}
+        ]}"#,
+        )
+        .unwrap();
+        assert!(!Simulator::is_navigation_item(&screen.items()[0]));
+        assert!(Simulator::is_navigation_item(&screen.items()[1]));
+    }
 }

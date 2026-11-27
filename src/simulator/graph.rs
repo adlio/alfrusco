@@ -427,13 +427,13 @@ impl WorkflowGraph {
         };
 
         // Collect all string-valued config entries
-        let config_strings = config
-            .map(|c| {
-                c.iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let config_strings = match config {
+            Some(c) => c
+                .iter()
+                .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                .collect(),
+            None => HashMap::default(),
+        };
 
         Some(ObjectNode {
             uid,
