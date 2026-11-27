@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-26
+
+### Breaking
+- **`WorkflowConfig` has a new public field, `theme_window_width`** (read from
+  `alfred_theme_window_width`). Code that builds `WorkflowConfig` with a struct literal must
+  add the field, for example `theme_window_width: None`. Code that gets its config from a
+  `ConfigProvider` such as `AlfredEnvProvider` needs no change.
 
 ### Added
 - **Alfred 6 Script Filter keys.** `Response::strict_mods` / `Workflow::strict_mods` write
@@ -35,11 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Arg` now converts from `&str`, `String`, `Vec<_>` and arrays.
 
 ### Changed
-- **Breaking:** `WorkflowConfig` has a new public field, `theme_window_width`, so code that
-  builds it with a struct literal must add the field.
-- `AsyncRunnable` allows clippy's `double_must_use`, which `#[async_trait]` triggers on
-  Rust 1.99, and two simulator expressions are rewritten to pass Rust 1.100's
-  `map_unwrap_or` lint while still building on 1.99. No behavior change.
+- Builds cleanly under clippy on Rust 1.99 and 1.100: `AsyncRunnable` allows the
+  `double_must_use` lint that `#[async_trait]` triggers, and two simulator expressions are
+  rewritten for the `map_unwrap_or` lint. No behavior change.
 
 ### Fixed
 - The simulator uses the selected modifier's argument, variables and validity when routing a
@@ -229,7 +233,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fuzzy filtering and sorting
 - Comprehensive error handling
 
-[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.4.5...HEAD
+[Unreleased]: https://github.com/adlio/alfrusco/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/adlio/alfrusco/compare/v0.4.5...v0.5.0
 [0.4.5]: https://github.com/adlio/alfrusco/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/adlio/alfrusco/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/adlio/alfrusco/compare/v0.4.2...v0.4.3

@@ -28,7 +28,7 @@ Add alfrusco to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-alfrusco = "0.4"
+alfrusco = "0.5"
 
 # For async workflows
 tokio = { version = "1", features = ["full"] }
