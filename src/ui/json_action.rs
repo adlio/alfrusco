@@ -31,25 +31,25 @@ use crate::Arg;
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct JsonAction {
-    variables: Map<String, Value>,
-    pulse: Option<Pulse>,
-    remove: Option<Remove>,
-    insert: Option<Insert>,
-    update: Option<Update>,
-    replace: Option<Replace>,
-    sheet: Option<Sheet>,
-    share: Option<Share>,
-    sound: Option<Sound>,
-    speak: Option<Speak>,
-    copy: Option<ClipboardCopy>,
-    open: Option<Open>,
-    opendialog: Option<OpenDialog>,
-    window: Option<WindowCommand>,
-    notification: Option<Notification>,
-    functions: Option<Functions>,
-    popupmenu: Option<PopupMenu>,
-    finish: Option<Finish>,
-    extra: Map<String, Value>,
+    pub(crate) variables: Map<String, Value>,
+    pub(crate) pulse: Option<Pulse>,
+    pub(crate) remove: Option<Remove>,
+    pub(crate) insert: Option<Insert>,
+    pub(crate) update: Option<Update>,
+    pub(crate) replace: Option<Replace>,
+    pub(crate) sheet: Option<Sheet>,
+    pub(crate) share: Option<Share>,
+    pub(crate) sound: Option<Sound>,
+    pub(crate) speak: Option<Speak>,
+    pub(crate) copy: Option<ClipboardCopy>,
+    pub(crate) open: Option<Open>,
+    pub(crate) opendialog: Option<OpenDialog>,
+    pub(crate) window: Option<WindowCommand>,
+    pub(crate) notification: Option<Notification>,
+    pub(crate) functions: Option<Functions>,
+    pub(crate) popupmenu: Option<PopupMenu>,
+    pub(crate) finish: Option<Finish>,
+    pub(crate) extra: Map<String, Value>,
 }
 
 impl JsonAction {
@@ -284,8 +284,8 @@ impl Insert {
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Update {
     #[serde(skip_serializing_if = "Option::is_none")]
-    relayout: Option<bool>,
-    ids: BTreeMap<String, Properties>,
+    pub(crate) relayout: Option<bool>,
+    pub(crate) ids: BTreeMap<String, Properties>,
     #[serde(flatten)]
     extra: Map<String, Value>,
 }
@@ -725,7 +725,7 @@ impl WindowCommand {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Notification {
     #[serde(serialize_with = "one_or_many", skip_serializing_if = "Vec::is_empty")]
-    post: Vec<Post>,
+    pub(crate) post: Vec<Post>,
     #[serde(skip_serializing_if = "Option::is_none")]
     remove: Option<Arg>,
     #[serde(flatten)]
@@ -790,7 +790,7 @@ impl Post {
 #[non_exhaustive]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Functions {
-    ids: BTreeMap<String, Arg>,
+    pub(crate) ids: BTreeMap<String, Arg>,
     #[serde(flatten)]
     extra: Map<String, Value>,
 }

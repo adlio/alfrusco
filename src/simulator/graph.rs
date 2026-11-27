@@ -4,10 +4,12 @@
 //! actions, utilities) connected by edges (optionally gated by modifier keys). This module
 //! parses that graph and provides queries for reachability, keyword lookup, and audit.
 
+use super::action::ActionResult;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 /// The kind of an Alfred workflow object.
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectKind {
     /// A Script Filter input (`alfred.workflow.input.scriptfilter`).
@@ -32,6 +34,13 @@ pub enum ObjectKind {
     /// Receives calls from [`CallExternalTrigger`](Self::CallExternalTrigger) nodes
     /// and continues traversal along its outgoing connections.
     ExternalTrigger,
+    /// An Alfred UI object (`alfred.workflow.userinterface.alfredui`, Alfred 6).
+    ///
+    /// Its `path` config names the `.alfredui` folder and `launchmode` says
+    /// whether it opens inside Alfred (0) or as a separate app (1). A `finish`
+    /// JSON action continues along its outgoing connections only in launch
+    /// mode 0.
+    AlfredUi,
     /// Any other Alfred object type.
     Other(String),
 }
@@ -48,6 +57,7 @@ impl ObjectKind {
             "alfred.workflow.output.clipboard" => Self::Clipboard,
             "alfred.workflow.output.callexternaltrigger" => Self::CallExternalTrigger,
             "alfred.workflow.trigger.external" => Self::ExternalTrigger,
+            "alfred.workflow.userinterface.alfredui" => Self::AlfredUi,
             other => Self::Other(other.to_string()),
         }
     }
@@ -68,12 +78,36 @@ pub struct ObjectNode {
     pub conditions: Vec<Condition>,
     /// Raw config key-value pairs (string values only).
     config_strings: HashMap<String, String>,
+    /// Raw config key-value pairs with integer values.
+    config_integers: HashMap<String, i64>,
 }
 
 impl ObjectNode {
     /// Returns a string config value by key (e.g. `"url"` for Open URL actions).
     pub fn config_value(&self, key: &str) -> Option<&str> {
         self.config_strings.get(key).map(String::as_str)
+    }
+
+    /// Returns an integer config value by key (e.g. `"launchmode"` for Alfred
+    /// UI objects).
+    pub fn config_integer(&self, key: &str) -> Option<i64> {
+        self.config_integers.get(key).copied()
+    }
+
+    /// The `.alfredui` folder of an Alfred UI object, relative to the
+    /// workflow folder.
+    pub fn alfred_ui_path(&self) -> Option<&str> {
+        if self.kind == ObjectKind::AlfredUi {
+            self.config_value("path").filter(|s| !s.is_empty())
+        } else {
+            None
+        }
+    }
+
+    /// True for an Alfred UI object set to launch as a separate app
+    /// (`launchmode` 1). Its `finish` output reaches no connected object.
+    pub fn launches_externally(&self) -> bool {
+        self.kind == ObjectKind::AlfredUi && self.config_integer("launchmode") == Some(1)
     }
 
     /// Returns the script file name configured on this Script Filter, if any.
@@ -434,6 +468,17 @@ impl WorkflowGraph {
                 .collect(),
             None => HashMap::default(),
         };
+        let config_integers = match config {
+            Some(c) => c
+                .iter()
+                .filter_map(|(k, v)| {
+                    v.as_signed_integer()
+                        .or_else(|| v.as_unsigned_integer().and_then(|n| i64::try_from(n).ok()))
+                        .map(|n| (k.clone(), n))
+                })
+                .collect(),
+            None => HashMap::default(),
+        };
 
         Some(ObjectNode {
             uid,
@@ -442,6 +487,7 @@ impl WorkflowGraph {
             title,
             conditions,
             config_strings,
+            config_integers,
         })
     }
 
@@ -640,7 +686,8 @@ impl WorkflowGraph {
             let reachable = self.reachable_kinds(&filter.uid);
             let has_action = reachable.contains(&ObjectKind::OpenUrl)
                 || reachable.contains(&ObjectKind::RunScript)
-                || reachable.contains(&ObjectKind::Clipboard);
+                || reachable.contains(&ObjectKind::Clipboard)
+                || reachable.contains(&ObjectKind::AlfredUi);
             let has_drill_in = reachable.contains(&ObjectKind::ScriptFilter);
 
             if !has_action && !has_drill_in {
@@ -652,6 +699,23 @@ impl WorkflowGraph {
                         filter.uid,
                     ),
                     object_uid: Some(filter.uid.clone()),
+                });
+            }
+        }
+
+        // An externally launched Alfred UI never passes `finish` output on
+        // (observed on Alfred 6.0.3), so its outgoing connections are dead.
+        for node in self.objects.values().filter(|n| n.launches_externally()) {
+            if self.connections.iter().any(|c| c.source_uid == node.uid) {
+                diagnostics.push(AuditDiagnostic {
+                    severity: Severity::Warning,
+                    message: format!(
+                        "Alfred UI '{}' ({}) launches externally (launchmode 1), so its \
+                         outgoing connections never run",
+                        node.alfred_ui_path().unwrap_or("?"),
+                        node.uid,
+                    ),
+                    object_uid: Some(node.uid.clone()),
                 });
             }
         }
@@ -671,6 +735,57 @@ impl WorkflowGraph {
         }
 
         diagnostics
+    }
+
+    /// The UID of the Alfred UI object whose `path` is `path`, such as
+    /// `"tasks.alfredui"`.
+    pub fn alfred_ui_uid(&self, path: &str) -> Option<&str> {
+        self.objects
+            .values()
+            .find(|n| n.alfred_ui_path() == Some(path))
+            .map(|n| n.uid.as_str())
+    }
+
+    /// Follows a `finish` JSON action from the Alfred UI object `ui_uid` to
+    /// the object it would reach, the way an actioned result is followed.
+    ///
+    /// `finish` is the `finish` command's JSON, such as
+    /// `{"args": ["T-42"], "variables": {"mode": "edit"}}`. Conditionals see
+    /// the first arg as `{query}` and the string and number variables as
+    /// `{var:name}`; Alfred drops object and array variables (observed on
+    /// 6.0.3). How Alfred builds `{query}` from several args wasn't probed.
+    /// An Alfred UI object that launches externally gives
+    /// [`ActionResult::DeadEnd`]: Alfred 6.0.3 closes the window and runs
+    /// nothing downstream.
+    pub fn route_finish(&self, ui_uid: &str, finish: &serde_json::Value) -> ActionResult {
+        match self.objects.get(ui_uid) {
+            Some(node) if node.kind == ObjectKind::AlfredUi && !node.launches_externally() => {}
+            _ => return ActionResult::DeadEnd,
+        }
+        let arg = match finish.get("args") {
+            Some(serde_json::Value::Array(args)) => args.first().cloned(),
+            other => other.cloned(),
+        }
+        .map(|arg| match arg {
+            serde_json::Value::String(s) => s,
+            other => other.to_string(),
+        });
+        let variables: serde_json::Map<String, serde_json::Value> = finish
+            .get("variables")
+            .and_then(serde_json::Value::as_object)
+            .map_or_else(serde_json::Map::new, |vars| {
+                vars.iter()
+                    .filter(|(_, v)| !v.is_object() && !v.is_array())
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            });
+        let variables = serde_json::Value::Object(variables);
+        let context = super::action::ItemContext {
+            arg: arg.as_deref(),
+            variables: Some(&variables),
+            session_variables: None,
+        };
+        super::action::resolve_action(self, ui_uid, true, None, &context, 0)
     }
 
     /// Finds the External Trigger input node that matches a given trigger ID.

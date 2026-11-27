@@ -1,11 +1,19 @@
-//! Typed builders for Alfred UI's `ui.json`.
+//! Alfred UI: typed builders for `ui.json`, a backend for the UI's scripts,
+//! and checks Alfred doesn't make.
 //!
 //! Alfred 6 adds Alfred UI: native macOS windows described in a `ui.json`
 //! file inside a `.alfredui` folder and opened by the Alfred UI workflow
-//! object. This module models that file so a workflow can build its UI in
-//! Rust and write the JSON, instead of editing it by hand.
+//! object. This module has three parts:
 //!
-//! The model only serializes. It doesn't run the UI or answer its events.
+//! - **The model** ([`Ui`], [`Window`], [`View`] and the components) builds
+//!   `ui.json` in Rust instead of by hand. It only serializes.
+//! - **The backend** ([`UiRunnable`], [`UiContext`], [`UiResponse`],
+//!   [`execute_ui`]) is what a UI's `script` actions and pulse run: it reads
+//!   the arguments and variables Alfred passes and writes JSON actions back.
+//! - **The checks** ([`UiPackage`], [`check_actions`]) find the mistakes
+//!   Alfred ignores silently, and run a UI script the way Alfred does. The
+//!   [`simulator`](crate::simulator) follows a `finish` out of the UI to the
+//!   next workflow object.
 //!
 //! ```
 //! use alfrusco::ui::{Button, Event, JsonAction, Size, Trigger, Ui, View, Window};
@@ -64,6 +72,89 @@
 //! # }
 //! ```
 //!
+//! # Script backends
+//!
+//! A `script` action names a file in the `.alfredui` folder that Alfred
+//! runs; point it at your workflow binary (or a small shell script that
+//! execs it) and call [`execute_ui`] from `main`:
+//!
+//! <!-- README backend example -->
+//! ```no_run
+//! use alfrusco::ui::{execute_ui, UiContext, UiResponse, UiRunnable};
+//!
+//! struct Backend;
+//!
+//! impl UiRunnable for Backend {
+//!     type Error = alfrusco::Error;
+//!
+//!     fn run(self, ctx: &UiContext, response: &mut UiResponse) -> Result<(), Self::Error> {
+//!         if ctx.arg(0) == Some("rename") {
+//!             let title = ctx.resolved_arg(1).unwrap_or("Untitled");
+//!             response.update("title", "text", title).update("status", "text", "Saved");
+//!         }
+//!         Ok(())
+//!     }
+//! }
+//!
+//! fn main() {
+//!     execute_ui(&UiContext::from_env(), Backend, &mut std::io::stdout());
+//! }
+//! ```
+//!
+//! Test a backend in-process with [`UiContext::new`] and [`UiContext::run`],
+//! check its output against the UI with [`UiPackage::check_response`], and
+//! run the real script the way Alfred does with [`UiPackage::run_script`].
+//!
+//! ## What Alfred 6.0.3 passes and expects
+//!
+//! Observed on Alfred 6.0.3 (build 3225):
+//!
+//! - The script is exec'd directly: it needs the exec bit (and a shebang for
+//!   a script). A missing or non-executable file is only logged.
+//! - Its working directory is the `.alfredui` folder, not the workflow folder,
+//!   and stdin is at EOF.
+//! - Each `args` element is one argument. Booleans arrive as `1` / `0`,
+//!   numbers in decimal, `null` as an empty string, and objects and arrays as
+//!   compact JSON without their source key order. A string `args` is one
+//!   argument. `flattenarrayargs` flattens arrays recursively.
+//! - A missing `{var:}` or component in `{value:}` becomes an empty string;
+//!   `{value:id.property}` with an unknown property stays as literal text
+//!   (see [`is_unresolved_placeholder`] and [`UiContext::resolved_arg`]).
+//! - The environment holds Alfred's process environment, the usual `alfred_*`
+//!   variables (`alfred_workflow_data` and `alfred_workflow_cache` are named
+//!   but not created; [`UiContext::data_dir`] creates them), every
+//!   `variablesconfig` entry stringified like args, and `alfred_ui_source`,
+//!   the id of the component whose event fired. The pulse gets no
+//!   `alfred_ui_source`, which is how [`UiContext::invocation`] tells them
+//!   apart. Nothing else reaches the environment: not ui.json `variables`,
+//!   not action `variables`, and not variables a script set, unless
+//!   `variablesconfig` declares them.
+//! - Stdout must be exactly one JSON value. Empty output, plain text, two
+//!   JSON documents, or a non-zero exit make Alfred log an error and drop the
+//!   output, and the user sees nothing. stderr lines are logged and never
+//!   parsed. Unknown top-level keys are ignored without a warning.
+//!
+//! So [`execute_ui`] always writes one JSON object: `{}` when there's
+//! nothing to do, and a notification when the backend returns an error or
+//! panics. It never exits non-zero. [`UiResponse::problems`] and
+//! [`check_actions`] flag unknown commands and the `finish` variable types
+//! Alfred drops, and [`execute_ui`] writes those problems to stderr, where
+//! Alfred's UI log shows them.
+//!
+//! ## Not known
+//!
+//! These weren't observed, so this crate doesn't assume them:
+//!
+//! - Where `finish` output goes when the UI launches externally (launch
+//!   mode 1). The window closes and no connected object ran in three runs;
+//!   whether Alfred hands the output on anywhere else is unknown.
+//! - Whether `alfred_debug` is set while the workflow debugger is open.
+//! - What `{data:property}` gives inside a dataview cell's event (it needs a
+//!   real click); outside a cell it's an empty string.
+//! - Whether Alfred kills a long synchronous script. Use `async: true` or the
+//!   pulse for slow work.
+//! - Non-ASCII and very large output, and the `stackview` launch option.
+//!
 //! # Keeping up with Alfred
 //!
 //! Alfred UI is new and its property names still change between builds.
@@ -91,6 +182,8 @@ use crate::{Arg, Result};
 
 #[macro_use]
 mod macros;
+mod backend;
+mod check;
 mod component;
 mod dataview;
 mod event;
@@ -100,6 +193,11 @@ mod property;
 mod settings;
 mod window;
 
+pub use backend::{
+    execute_ui, execute_ui_async, is_unresolved_placeholder, AsyncUiRunnable, Invocation,
+    UiContext, UiResponse, UiRunnable, SOURCE_VAR,
+};
+pub use check::{check_actions, Problem, ScriptRun, UiPackage, JSON_ACTION_COMMANDS};
 pub use component::{
     Border, BorderShape, Button, ButtonEffect, Checkbox, Component, FileComponent, ImageView,
     Label, LineBreak, MarkdownArea, PasswordField, Picker, PickerItem, PickerItemType, Progress,

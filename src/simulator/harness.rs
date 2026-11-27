@@ -16,6 +16,7 @@ use super::action::ActionResult;
 use super::graph::Severity;
 use super::screen::{Screen, ScreenItem};
 use super::{ObjectKind, WorkflowGraph};
+use crate::ui::{UiPackage, UiResponse};
 
 /// A headless Alfred workflow simulator.
 ///
@@ -137,6 +138,37 @@ impl Simulator {
     /// Returns the workflow's bundle ID.
     pub fn bundleid(&self) -> &str {
         &self.bundleid
+    }
+
+    /// The `.alfredui` package of the Alfred UI object `ui_uid`, read from
+    /// the workflow folder, for [`UiPackage::problems`] and
+    /// [`UiPackage::run_script`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `ui_uid` isn't an Alfred UI object or its
+    /// `ui.json` can't be read.
+    pub fn ui_package(&self, ui_uid: &str) -> Result<UiPackage, SimulatorError> {
+        let path = self
+            .graph
+            .objects()
+            .get(ui_uid)
+            .and_then(super::ObjectNode::alfred_ui_path)
+            .ok_or_else(|| {
+                SimulatorError::PlistParse(format!("{ui_uid} is not an Alfred UI object"))
+            })?;
+        UiPackage::open(self.workflow_dir.join(path)).map_err(|e| SimulatorError::Io(e.to_string()))
+    }
+
+    /// Follows the `finish` command in `response` from the Alfred UI object
+    /// `ui_uid` to the object it reaches. See [`WorkflowGraph::route_finish`].
+    ///
+    /// A response without `finish` gives [`ActionResult::DeadEnd`].
+    pub fn route_finish(&self, ui_uid: &str, response: &UiResponse) -> ActionResult {
+        match response.to_json().get("finish") {
+            Some(finish) => self.graph.route_finish(ui_uid, finish),
+            None => ActionResult::DeadEnd,
+        }
     }
 
     /// Runs a [`Runnable`] workflow in-process and returns the rendered [`Screen`].

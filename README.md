@@ -420,11 +420,65 @@ std::fs::create_dir_all("fruit.alfredui")?;
 ui.write_pretty(std::fs::File::create("fruit.alfredui/ui.json")?)?;
 ```
 
-The model only serializes; it doesn't run the UI or answer its events. Alfred
-UI still renames properties between builds, so every struct has a
+Alfred UI still renames properties between builds, so every struct has a
 `set(key, value)` escape hatch that writes any key as is (replacing the typed
 property of the same name), and `Component::raw(json)` accepts a component this
 crate doesn't model yet.
+
+### Alfred UI script backends
+
+A UI's `script` actions and pulse run a program from the `.alfredui` folder
+and apply the JSON actions it prints. Implement `UiRunnable` and call
+`execute_ui` from `main`:
+
+```rust
+use alfrusco::ui::{execute_ui, UiContext, UiResponse, UiRunnable};
+
+struct Backend;
+
+impl UiRunnable for Backend {
+    type Error = alfrusco::Error;
+
+    fn run(self, ctx: &UiContext, response: &mut UiResponse) -> Result<(), Self::Error> {
+        if ctx.arg(0) == Some("rename") {
+            let title = ctx.resolved_arg(1).unwrap_or("Untitled");
+            response.update("title", "text", title).update("status", "text", "Saved");
+        }
+        Ok(())
+    }
+}
+
+fn main() {
+    execute_ui(&UiContext::from_env(), Backend, &mut std::io::stdout());
+}
+```
+
+`UiContext` reads what Alfred 6 passes: the action's `args` as arguments,
+`variablesconfig` entries as environment variables, and `alfred_ui_source`
+(the component whose event fired; absent for the pulse). `execute_ui` always
+writes exactly one JSON object and never exits non-zero, because Alfred drops
+empty output, plain text and the output of a failed script without telling the
+user. An error or panic becomes a notification instead.
+
+For tests:
+
+- `UiContext::new().with_arg(..).with_var(..).run(backend)` runs a backend
+  in-process and returns its `UiResponse`.
+- `UiPackage::open("tasks.alfredui")?.problems()` reports missing files and
+  scripts, scripts without the exec bit, ids that actions and `{value:}`
+  placeholders target but no component has, missing template parameters, and
+  unknown keys and types, all of which Alfred ignores silently.
+- `package.run_script("scripts/backend", &ctx)` runs a script the way Alfred
+  does (cwd = the `.alfredui` folder, stdin at EOF, only the given variables)
+  and checks its output.
+- The simulator knows the Alfred UI object: results that open it route to
+  `ActionResult::OpenedUi`, and `Simulator::route_finish` follows a `finish`
+  to the next object. Alfred passes `finish` output on only when the UI opens
+  inside Alfred (launch mode 0); the audit warns about connections from an
+  externally launched UI.
+
+The `alfrusco::ui` docs list exactly what Alfred 6.0.3 was observed to pass
+and expect, and what is still unknown.
 
 ### Filtering and Sorting
 
@@ -802,6 +856,8 @@ cargo run --example static_output
 - `View` (`stack`, `border`, `grid`, `inline`, `form`, `flex`) and the components `Label`, `Button`, `Checkbox`, `Picker`, `TextField`, `PasswordField`, `TextArea`, `MarkdownArea`, `Progress`, `ImageView`, `DataView`, `WebKitView`, `Template`, `FileComponent`
 - `Event`, `Trigger`, `Action` (`log`, `script`, `json`, `function`) and the `JsonAction` commands (`update`, `insert`, `remove`, `replace`, `sheet`, `finish` and the rest)
 - `Colour`, `Font`, `Image`, `Constraints`, `Placeholder`
+- Backend: `UiRunnable` / `AsyncUiRunnable`, `UiContext`, `UiResponse`, `execute_ui` / `execute_ui_async`
+- Checks: `UiPackage` (`problems`, `check_response`, `run_script`), `check_actions`
 
 ### Traits
 
