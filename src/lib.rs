@@ -21,6 +21,7 @@ pub mod clipboard;
 pub mod config;
 pub mod internal_handlers;
 pub mod simulator;
+pub mod ui;
 
 pub use action::{ItemType, UniversalAction};
 pub use arg::Arg;

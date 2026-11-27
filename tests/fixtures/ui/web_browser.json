@@ -1,0 +1,129 @@
+{
+  "bundleid": "com.example.browser",
+  "variablesconfig": {
+    "url": { "default": "https://example.com", "src": "args[0]" }
+  },
+  "debug": { "reloadshortcut": "⌘⇧R" },
+  "window": {
+    "title": "Browser",
+    "titlevisibility": false,
+    "titlebarappearstransparent": true,
+    "fullsizecontentview": true,
+    "toolbar": { "type": "unified" },
+    "size": { "width": 960, "height": 720 },
+    "minsize": { "width": 480, "height": 320 },
+    "frameautosave": true,
+    "root": {
+      "type": "view",
+      "layout": "border",
+      "padding": 8,
+      "spacing": 8,
+      "shortcuts": [
+        {
+          "shortcut": "⌘L",
+          "action": {
+            "type": "json",
+            "src": { "update": { "ids": { "address": { "focus": true } } } }
+          }
+        }
+      ],
+      "components": [
+        {
+          "type": "view",
+          "constraints": { "region": "top" },
+          "layout": "border",
+          "spacing": 6,
+          "components": [
+            {
+              "type": "view",
+              "constraints": { "region": "left" },
+              "layout": "inline",
+              "direction": "horizontal",
+              "spacing": 2,
+              "components": [
+                {
+                  "type": "button",
+                  "id": "back",
+                  "tooltip": "Back",
+                  "image": { "type": "symbol", "src": "chevron.left" },
+                  "bordered": false,
+                  "events": [
+                    {
+                      "triggers": "actioned",
+                      "action": { "type": "function", "src": "page", "args": "back" }
+                    }
+                  ]
+                },
+                {
+                  "type": "button",
+                  "id": "forward",
+                  "tooltip": "Forward",
+                  "image": { "type": "symbol", "src": "chevron.right" },
+                  "bordered": false,
+                  "events": [
+                    {
+                      "triggers": "actioned",
+                      "action": { "type": "function", "src": "page", "args": "forward" }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "textfield",
+              "id": "address",
+              "constraints": { "region": "centre" },
+              "textinsets": { "horizontal": 4 },
+              "events": [
+                {
+                  "triggers": "actioned",
+                  "action": {
+                    "type": "json",
+                    "src": {
+                      "variables": { "url": "{value:self.text}" },
+                      "update": { "ids": { "page": { "src": "{var:url}" } } }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "button",
+              "id": "reload",
+              "constraints": { "region": "right" },
+              "tooltip": "Reload ⌘R",
+              "shortcut": "⌘R",
+              "image": { "type": "symbol", "src": "arrow.clockwise" },
+              "bordered": false,
+              "events": [
+                {
+                  "triggers": "actioned",
+                  "action": { "type": "function", "src": "page", "args": "reload" }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "webkitview",
+          "id": "page",
+          "constraints": { "region": "centre" },
+          "src": "{var:url}",
+          "openlinksexternally": "^mailto:",
+          "events": [
+            {
+              "triggers": "changed",
+              "action": {
+                "type": "json",
+                "src": {
+                  "variables": { "url": "{value:self.src}" },
+                  "update": { "ids": { "address": { "text": "{var:url}" } } }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

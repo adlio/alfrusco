@@ -1,0 +1,112 @@
+{
+  "colours": {
+    "panel": { "light": "#f4f1ea", "dark": "rgb(30, 30, 34)" }
+  },
+  "window": {
+    "size": { "height": 560 },
+    "padding": 8,
+    "root": {
+      "type": "view",
+      "layout": "border",
+      "spacing": 8,
+      "background": "panel",
+      "shortcuts": [
+        { "shortcut": "↑", "action": { "type": "function", "src": "swatches", "args": "selectup" } },
+        { "shortcut": "↓", "action": { "type": "function", "src": "swatches", "args": "selectdown" } },
+        { "shortcut": "←", "action": { "type": "function", "src": "swatches", "args": "selectprevious" } },
+        { "shortcut": "→", "action": { "type": "function", "src": "swatches", "args": "selectnext" } }
+      ],
+      "components": [
+        {
+          "type": "textfield",
+          "id": "query",
+          "constraints": { "region": "top" },
+          "focus": true,
+          "placeholder": "Search colours",
+          "font": { "size": "extralarge" },
+          "textinsets": { "horizontal": 8, "vertical": 8 },
+          "focusring": false,
+          "events": [
+            {
+              "triggers": "changed",
+              "action": { "type": "function", "src": "swatches", "args": "filterdata" }
+            },
+            {
+              "triggers": "actioned",
+              "action": {
+                "type": "json",
+                "src": {
+                  "finish": {
+                    "args": "{value:swatches.selected.swatch.background}",
+                    "variables": { "colourname": "{value:swatches.selected.name.text}" }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "dataview",
+          "id": "swatches",
+          "constraints": { "region": "centre" },
+          "placeholder": "No colours match",
+          "cols": 3,
+          "spacing": 4,
+          "behaviour": { "selection": { "wrap": "vertical" } },
+          "cell": {
+            "height": 96,
+            "init": { "name.colour": "labelColor", "tile.background": null },
+            "selected": {
+              "name.colour": "alfredSelectedResultTextColor",
+              "tile.background": "alfredSelectedResultBackgroundColor"
+            },
+            "root": {
+              "type": "view",
+              "id": "tile",
+              "layout": "stack",
+              "cornerradius": 6,
+              "components": [
+                {
+                  "type": "view",
+                  "layout": "border",
+                  "padding": 4,
+                  "spacing": 6,
+                  "components": [
+                    {
+                      "type": "view",
+                      "id": "swatch",
+                      "constraints": { "region": "centre" },
+                      "layout": "stack",
+                      "cornerradius": 4
+                    },
+                    {
+                      "type": "label",
+                      "id": "name",
+                      "constraints": { "region": "bottom" },
+                      "textalign": "centre"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "data": {
+            "type": "basic",
+            "src": [
+              { "uid": "teal", "swatch.background": "#008080", "name.text": "Teal" },
+              { "uid": "coral", "swatch.background": "#ff7f50", "name.text": "Coral" },
+              { "uid": "mustard", "swatch.background": "#e1ad01", "name.text": "Mustard" },
+              { "uid": "plum", "swatch.background": "#8e4585", "name.text": "Plum" }
+            ],
+            "filter": {
+              "type": "basic",
+              "args": "name.text",
+              "match": "{value:query.text}",
+              "matchmode": "wordmatchanyorder"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
