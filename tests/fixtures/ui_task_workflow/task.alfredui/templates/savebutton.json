@@ -1,0 +1,15 @@
+{
+  "type": "button",
+  "text": "Save {param:field}",
+  "events": [
+    {
+      "triggers": "actioned",
+      "action": {
+        "type": "script",
+        "src": "scripts/backend",
+        "args": ["save", "{param:field}", "{var:token}"],
+        "async": true
+      }
+    }
+  ]
+}

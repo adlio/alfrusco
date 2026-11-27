@@ -1,0 +1,67 @@
+{
+  "bundleid": "com.example.tasks",
+  "variablesconfig": {
+    "task_id": { "src": "args[0]" },
+    "token": { "default": "" }
+  },
+  "pulse": { "src": "scripts/backend", "args": ["tick"], "interval": 30 },
+  "window": {
+    "padding": 8,
+    "root": {
+      "type": "view",
+      "layout": "border",
+      "spacing": 8,
+      "events": [
+        {
+          "triggers": "preload",
+          "action": { "type": "script", "src": "scripts/backend", "args": ["load", "{var:task_id}"] }
+        }
+      ],
+      "components": [
+        "{file:components/header.json}",
+        {
+          "type": "markdownarea",
+          "id": "description",
+          "constraints": { "region": "centre" }
+        },
+        {
+          "type": "view",
+          "layout": "inline",
+          "direction": "vertical",
+          "constraints": { "region": "right" },
+          "components": [
+            {
+              "type": "picker",
+              "id": "step",
+              "items": [{ "text": "Open", "value": "open" }, { "text": "Done", "value": "done" }]
+            },
+            { "type": "template", "src": "templates/savebutton.json", "params": { "field": "step" } },
+            {
+              "type": "button",
+              "id": "open",
+              "text": "Open in browser",
+              "events": [
+                {
+                  "triggers": "actioned",
+                  "action": {
+                    "type": "json",
+                    "src": {
+                      "finish": { "args": ["{var:task_id}"], "variables": { "outcome": "open" } }
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "button",
+              "text": "Next step",
+              "events": [
+                { "triggers": "actioned", "action": { "type": "function", "src": "step", "args": "selectnext" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+#!/bin/sh
+# A stand-in UI backend for alfrusco's tests. It answers the way a real
+# Alfred UI script does: one JSON object on stdout, always exit 0.
+case "$1" in
+  load)
+    printf '{"variables":{"token":"tok-1"},"update":{"ids":{"description":{"text":"# Task %s"},"status":{"text":"Loaded"}}}}\n' "$2"
+    ;;
+  save)
+    printf '{"update":{"ids":{"status":{"text":"Saved %s"}}}}\n' "$2"
+    ;;
+  whoami)
+    if read -r _line; then stdin=data; else stdin=eof; fi
+    printf '{"variables":{"cwd":"%s","task_id":"%s","source":"%s","stdin":"%s","leaked":"%s","args":"%s"}}\n' \
+      "$(basename "$PWD")" "$task_id" "${alfred_ui_source-pulse}" "$stdin" "${CARGO_MANIFEST_DIR-none}" "$#"
+    ;;
+  *)
+    printf '{}\n'
+    ;;
+esac

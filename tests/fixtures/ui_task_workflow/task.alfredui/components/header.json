@@ -1,0 +1,11 @@
+{
+  "type": "view",
+  "layout": "inline",
+  "direction": "horizontal",
+  "spacing": 8,
+  "constraints": { "region": "top" },
+  "components": [
+    { "type": "textfield", "id": "title", "placeholder": "Title" },
+    { "type": "label", "id": "status", "text": "Synced" }
+  ]
+}

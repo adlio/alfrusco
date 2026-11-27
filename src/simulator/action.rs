@@ -41,6 +41,7 @@ use super::graph::{Condition, ObjectKind, WorkflowGraph};
 ///
 /// assert!(ActionResult::DeadEnd.is_dead_end());
 /// ```
+#[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionResult {
     /// The item routes to another Script Filter (drill-in / loopback navigation).
@@ -56,6 +57,11 @@ pub enum ActionResult {
     /// The item routes to a Run Script action.
     RanScript {
         /// The UID of the Run Script object.
+        target_uid: String,
+    },
+    /// The item routes to an Alfred UI object (Alfred 6).
+    OpenedUi {
+        /// The UID of the Alfred UI object.
         target_uid: String,
     },
     /// The item is not valid and has an autocomplete string (loopback to same filter).
@@ -101,6 +107,18 @@ impl ActionResult {
         match self {
             Self::RanScript { target_uid } => target_uid,
             other => panic!("expected RanScript, got {other:?}"),
+        }
+    }
+
+    /// Asserts that this action opens an Alfred UI window.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is not an `OpenedUi` result.
+    pub fn assert_opens_ui(&self) -> &str {
+        match self {
+            Self::OpenedUi { target_uid } => target_uid,
+            other => panic!("expected OpenedUi, got {other:?}"),
         }
     }
 
@@ -212,6 +230,9 @@ fn resolve_from_node(
             ActionResult::OpenedUrl { url_template }
         }
         ObjectKind::RunScript => ActionResult::RanScript {
+            target_uid: dest_uid.clone(),
+        },
+        ObjectKind::AlfredUi => ActionResult::OpenedUi {
             target_uid: dest_uid.clone(),
         },
         ObjectKind::Conditional => {
@@ -339,6 +360,9 @@ fn classify_or_continue(
             ActionResult::OpenedUrl { url_template }
         }
         ObjectKind::RunScript => ActionResult::RanScript {
+            target_uid: dest_uid.to_string(),
+        },
+        ObjectKind::AlfredUi => ActionResult::OpenedUi {
             target_uid: dest_uid.to_string(),
         },
         ObjectKind::Conditional => {

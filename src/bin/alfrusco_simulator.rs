@@ -231,7 +231,11 @@ fn run_walk(dir: &Path, binary: &Path, source_filter: Option<&str>, query: &[Str
                 ActionResult::TypedAutocomplete { text } => {
                     format!("→ TypedAutocomplete(\"{text}\")")
                 }
+                ActionResult::OpenedUi { target_uid } => {
+                    format!("→ OpenedUi({target_uid})")
+                }
                 ActionResult::DeadEnd => "→ DeadEnd ⚠".to_string(),
+                other => format!("→ {other:?}"),
             };
             println!("      route: {routing}");
         }
