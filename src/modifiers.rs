@@ -104,18 +104,18 @@ impl Modifier {
     }
 
     pub fn icon_for_filetype(mut self, filetype: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: Some("filetype".to_string()),
-            path: filetype.into(),
-        });
+        self.icon = Some(Icon::for_filetype(filetype));
+        self
+    }
+
+    /// Uses the Finder icon of the file or folder at `path` (Alfred's `fileicon` type).
+    pub fn icon_for_file(mut self, path: impl Into<String>) -> Self {
+        self.icon = Some(Icon::for_file(path));
         self
     }
 
     pub fn icon_from_image(mut self, path_to_image: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: None,
-            path: path_to_image.into(),
-        });
+        self.icon = Some(Icon::from_image(path_to_image));
         self
     }
 
@@ -203,6 +203,19 @@ mod tests {
         let expected = json!({
             "icon": {
                 "path": "/Users/crayons/Documents/acrobat.png"
+            }
+        });
+        assert_eq!(json, expected);
+    }
+
+    #[test]
+    fn test_icon_for_file() {
+        let modifier = Modifier::new(Key::Ctrl).icon_for_file("~/Desktop");
+        let json = serde_json::to_value(&modifier).unwrap();
+        let expected = json!({
+            "icon": {
+                "type": "fileicon",
+                "path": "~/Desktop"
             }
         });
         assert_eq!(json, expected);
@@ -448,10 +461,7 @@ mod tests {
         assert_eq!(mod2.icon.as_ref().unwrap().path, "/path/to/icon.png");
 
         // Test icon() with Icon struct
-        let icon = Icon {
-            type_: Some("fileicon".to_string()),
-            path: "/custom/path".to_string(),
-        };
+        let icon = Icon::for_file("/custom/path");
         let mod3 = Modifier::new(Key::Ctrl).icon(icon);
         assert_eq!(
             mod3.icon.as_ref().unwrap().type_,

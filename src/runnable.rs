@@ -9,6 +9,9 @@ pub trait Runnable {
     fn run(self, workflow: &mut Workflow) -> std::result::Result<(), Self::Error>;
 }
 
+// async_trait marks the boxed future `#[must_use]`, which clippy flags as
+// redundant on Rust 1.99+.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait AsyncRunnable {
     type Error: WorkflowError;

@@ -37,18 +37,18 @@ impl URLItem {
     }
 
     pub fn icon_for_filetype(mut self, filetype: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: Some("filetype".to_string()),
-            path: filetype.into(),
-        });
+        self.icon = Some(Icon::for_filetype(filetype));
+        self
+    }
+
+    /// Uses the Finder icon of the file or folder at `path` (Alfred's `fileicon` type).
+    pub fn icon_for_file(mut self, path: impl Into<String>) -> Self {
+        self.icon = Some(Icon::for_file(path));
         self
     }
 
     pub fn icon_from_image(mut self, path_to_image: impl Into<String>) -> Self {
-        self.icon = Some(Icon {
-            type_: None,
-            path: path_to_image.into(),
-        });
+        self.icon = Some(Icon::from_image(path_to_image));
         self
     }
 
@@ -402,6 +402,17 @@ mod tests {
         let icon = item.icon.unwrap();
         assert_eq!(icon.type_, None);
         assert_eq!(icon.path, "/Users/crayons/Documents/acrobat.png");
+    }
+
+    #[test]
+    fn test_icon_for_file() {
+        let item: Item = URLItem::new("Desktop", "https://www.example.com")
+            .icon_for_file("~/Desktop")
+            .into();
+        assert_eq!(
+            serde_json::to_value(&item).unwrap()["icon"],
+            serde_json::json!({"type": "fileicon", "path": "~/Desktop"})
+        );
     }
 
     #[test]

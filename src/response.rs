@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::io;
 use std::time::Duration;
 
 use serde::{Serialize, Serializer};
 
-use crate::{Item, Result};
+use crate::{IconResize, Item, Result};
 
 /// Represents the contents of a complete Alfred response to an execution.
 ///
@@ -29,17 +30,31 @@ pub struct Response {
     #[serde(rename = "skipknowledge", skip_serializing_if = "Option::is_none")]
     pub(crate) skip_knowledge: Option<bool>,
 
+    /// Session variables: passed to the rest of the workflow stream and back
+    /// into the script when it reruns in the same session.
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub(crate) variables: HashMap<String, String>,
+
+    /// Grid View only: the uid of the item to highlight when the view opens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    preselect: Option<String>,
+
+    /// Alfred 6: treat undefined modifier combinations as `valid: false`.
+    #[serde(rename = "strictmods", skip_serializing_if = "Option::is_none")]
+    strict_mods: Option<bool>,
+
+    /// Alfred 6: how every result's icon fills its space.
+    #[serde(rename = "iconresize", skip_serializing_if = "Option::is_none")]
+    icon_resize: Option<IconResize>,
+
     /// The items to display in Alfred's output
     pub(crate) items: Vec<Item>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct CacheSettings {
-    #[serde(
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "duration_as_seconds"
-    )]
-    pub seconds: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<u64>,
 
     #[serde(skip_serializing_if = "Option::is_none", rename = "loosereload")]
     pub loose_reload: Option<bool>,
@@ -59,23 +74,18 @@ impl Response {
         }
     }
 
-    /// Sets the rerun interval for this Alfred response.
+    /// Sets the rerun interval for this Alfred response. Alfred accepts 0.1
+    /// to 5 seconds. The Grid View doesn't support this key.
     pub fn rerun(&mut self, duration: Duration) -> &mut Self {
         self.rerun = Some(duration);
         self
     }
 
-    /// When set to true, Alfred will not learn from the user's selection
-    /// and will present items in the order provided.
-    ///
-    /// In Alfred, an item's `uid` has two effects: it lets Alfred keep the
-    /// user's selection on that item across `rerun` cycles, and it enrolls
-    /// the item in Alfred's usage-based ranking. With `skipknowledge` set,
-    /// the ranking effect is disabled — a uid then only stabilizes
-    /// selection. Because that is purely beneficial, [`Response::write`]
-    /// auto-assigns a deterministic, title-derived uid to any item that
-    /// doesn't have one when this flag is true. Explicitly set uids are
-    /// never modified.
+    /// When true, Alfred does not learn new rankings from the user's selection.
+    /// Previously learned rankings for the object can still affect the order.
+    /// [`Response::write`] assigns deterministic, title-derived uids to items
+    /// that have none so Alfred can keep the selection stable across reruns.
+    /// Explicit uids are preserved.
     pub fn skip_knowledge(&mut self, skip_knowledge: bool) -> &mut Self {
         self.skip_knowledge = Some(skip_knowledge);
         self
@@ -84,12 +94,54 @@ impl Response {
     /// Enables the Alfred 5.5+ cache feature with the provided cache duration.
     /// If loose_reload is true, Alfred will return the stale results while
     /// waiting for the cache to be updated.
-    ///
+    /// Alfred expects 5 to 86400 whole seconds, or 0 to disable caching.
+    /// Fractional seconds are discarded.
     pub fn cache(&mut self, duration: Duration, loose_reload: bool) -> &mut Self {
         self.cache = Some(CacheSettings {
-            seconds: Some(duration),
+            seconds: Some(duration.as_secs()),
             loose_reload: Some(loose_reload),
         });
+        self
+    }
+
+    /// Sets a session variable. Alfred passes it to the objects connected
+    /// after this one and back into the script when it reruns in the same
+    /// session, which makes it a way to keep state across reruns. An item
+    /// variable of the same name overrides it when that item is actioned.
+    pub fn var(&mut self, key: impl Into<String>, value: impl Into<String>) -> &mut Self {
+        self.variables.insert(key.into(), value.into());
+        self
+    }
+
+    /// Removes a session variable set earlier with [`Response::var`].
+    pub fn unset_var(&mut self, key: impl AsRef<str>) -> &mut Self {
+        self.variables.remove(key.as_ref());
+        self
+    }
+
+    /// Grid View only: opens the view with the item whose `uid` matches
+    /// highlighted. The Script Filter Input ignores this key.
+    pub fn preselect(&mut self, uid: impl Into<String>) -> &mut Self {
+        self.preselect = Some(uid.into());
+        self
+    }
+
+    /// When true, a modifier combination the item doesn't define behaves as
+    /// if the item were `valid: false`, instead of running the default
+    /// action. Requires Alfred 6.
+    ///
+    /// Alfred applies this only once the user is fully inside the Script
+    /// Filter's results (for example after pressing ↩ on a partial keyword,
+    /// or when opened from a Hotkey Trigger).
+    pub fn strict_mods(&mut self, strict: bool) -> &mut Self {
+        self.strict_mods = Some(strict);
+        self
+    }
+
+    /// Sets how every result's icon fills its space. An icon's own
+    /// [`Icon::resize`](crate::Icon::resize) overrides it. Requires Alfred 6.
+    pub fn icon_resize(&mut self, resize: IconResize) -> &mut Self {
+        self.icon_resize = Some(resize);
         self
     }
 
@@ -145,23 +197,16 @@ impl Response {
 /// Custom serializer for serializing a Duration as a floating point number
 /// of seconds (the expected format for Alfred's rerun field).
 ///
-fn duration_as_seconds<S>(duration: &Option<Duration>, s: S) -> std::result::Result<S::Ok, S::Error>
+pub(crate) fn duration_as_seconds<S>(
+    duration: &Option<Duration>,
+    s: S,
+) -> std::result::Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     match duration {
-        Some(duration) => {
-            let secs = duration.as_secs();
-            let subsec_millis = duration.subsec_millis();
-
-            if subsec_millis == 0 {
-                s.serialize_u64(secs)
-            } else {
-                let millis = secs * 1000 + u64::from(subsec_millis);
-                let seconds = millis as f64 / 1000.0;
-                s.serialize_f64(seconds)
-            }
-        }
+        Some(d) if d.subsec_nanos() == 0 => s.serialize_u64(d.as_secs()),
+        Some(d) => s.serialize_f64(d.as_secs_f64()),
         None => s.serialize_none(),
     }
 }
@@ -445,7 +490,7 @@ mod tests {
     #[test]
     fn test_cache_settings_serialization() -> Result<()> {
         let cache_settings = CacheSettings {
-            seconds: Some(Duration::from_mins(1)),
+            seconds: Some(60),
             loose_reload: Some(true),
         };
 
@@ -453,7 +498,7 @@ mod tests {
         assert_eq!(json, r#"{"seconds":60,"loosereload":true}"#);
 
         let cache_settings_partial = CacheSettings {
-            seconds: Some(Duration::from_secs(30)),
+            seconds: Some(30),
             loose_reload: None,
         };
 
@@ -485,11 +530,13 @@ mod tests {
         let result = json!({ "duration": duration_as_seconds(&Some(zero_duration), serde_json::value::Serializer).unwrap() });
         assert_eq!(result.to_string(), r#"{"duration":0}"#);
 
-        // Test with very small duration - this will be rounded in serialization
-        let tiny_duration = Duration::from_nanos(1);
-        let result = json!({ "duration": duration_as_seconds(&Some(tiny_duration), serde_json::value::Serializer).unwrap() });
-        // For extremely small durations, it will be effectively 0 due to how the function works
-        assert_eq!(result.to_string(), r#"{"duration":0}"#);
+        // Cache TTLs are integers; reruns can retain fractional milliseconds.
+        let mut response = Response::new();
+        response.cache(Duration::from_millis(5500), false);
+        response.rerun(Duration::from_micros(100_500));
+        let json = serde_json::to_value(response).unwrap();
+        assert_eq!(json["cache"]["seconds"].as_u64(), Some(5));
+        assert_eq!(json["rerun"].as_f64(), Some(0.1005));
 
         // Test with very large duration
         let large_duration = Duration::from_secs(u64::MAX);
@@ -524,6 +571,50 @@ mod tests {
         let json = serde_json::to_string(&cache_settings)?;
         assert_eq!(json, r#"{}"#);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_session_variables() -> Result<()> {
+        let mut response = Response::new();
+        response
+            .var("mainview", "Finder")
+            .var("altview", "Safari")
+            .var("dropped", "x")
+            .var("also_dropped", "y")
+            .unset_var("dropped")
+            .unset_var(String::from("also_dropped"))
+            .unset_var("never_set");
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(
+            json["variables"],
+            json!({"mainview": "Finder", "altview": "Safari"})
+        );
+
+        // Removing the last variable drops the key instead of writing `{}`.
+        response.unset_var("mainview").unset_var("altview");
+        let json = serde_json::to_value(&response)?;
+        assert!(json.get("variables").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn test_preselect_strictmods_iconresize() -> Result<()> {
+        let mut response = Response::new();
+        response
+            .preselect("desktopfolder")
+            .strict_mods(true)
+            .icon_resize(IconResize::Fit);
+        let json = serde_json::to_value(&response)?;
+        assert_eq!(
+            json,
+            json!({
+                "preselect": "desktopfolder",
+                "strictmods": true,
+                "iconresize": "fit",
+                "items": []
+            })
+        );
         Ok(())
     }
 }

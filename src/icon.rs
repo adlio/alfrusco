@@ -303,19 +303,134 @@ pub const ICON_USERS_FOLDER: &str =
 pub const ICON_UTILITIES_FOLDER: &str =
     "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/UtilitiesFolder.icns";
 
+/// How an icon fills the space Alfred gives it.
+///
+/// Set per icon with [`Icon::resize`], or for every result with
+/// [`Response::icon_resize`](crate::Response::icon_resize). Requires Alfred 6.
+///
+/// When unset, Alfred uses `Stretch` in the Script Filter Input and `Fit` in
+/// the Grid View, for backwards compatibility.
+///
+/// See <https://www.alfredapp.com/help/workflows/inputs/script-filter/json/>
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IconResize {
+    /// Fit the image in the space, keeping its aspect ratio. May leave empty space.
+    Fit,
+    /// Fill the space, keeping the aspect ratio. May crop the image.
+    Fill,
+    /// Stretch the image to fill the space. May distort the image.
+    Stretch,
+    /// Centre the image without resizing. May crop it or leave empty space.
+    #[doc(alias = "Center")]
+    Centre,
+}
+
+/// The icon shown on an Alfred result row.
+///
+/// Build one with [`Icon::from_image`], [`Icon::for_file`] or
+/// [`Icon::for_filetype`], or convert a path string with `From`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Icon {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub(crate) type_: Option<String>,
 
     pub(crate) path: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) resize: Option<IconResize>,
+}
+
+impl Icon {
+    /// An image file, with a path relative to the workflow folder or absolute.
+    pub fn from_image(path: impl Into<String>) -> Self {
+        Icon {
+            type_: None,
+            path: path.into(),
+            resize: None,
+        }
+    }
+
+    /// The Finder icon of the file or folder at `path` (Alfred's `fileicon` type).
+    pub fn for_file(path: impl Into<String>) -> Self {
+        Icon {
+            type_: Some("fileicon".to_string()),
+            path: path.into(),
+            resize: None,
+        }
+    }
+
+    /// The system icon for a Uniform Type Identifier such as `public.folder`
+    /// (Alfred's `filetype` type).
+    pub fn for_filetype(uti: impl Into<String>) -> Self {
+        Icon {
+            type_: Some("filetype".to_string()),
+            path: uti.into(),
+            resize: None,
+        }
+    }
+
+    /// Sets how this icon fills its space, overriding the response-wide
+    /// [`Response::icon_resize`](crate::Response::icon_resize). Requires Alfred 6.
+    pub fn resize(mut self, resize: IconResize) -> Self {
+        self.resize = Some(resize);
+        self
+    }
 }
 
 impl<T: ToString> From<T> for Icon {
     fn from(path: T) -> Self {
-        Icon {
-            type_: None,
-            path: path.to_string(),
+        Icon::from_image(path.to_string())
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_icon_constructors() {
+        assert_eq!(
+            serde_json::to_value(Icon::from_image("./icon.png")).unwrap(),
+            json!({"path": "./icon.png"})
+        );
+        assert_eq!(
+            serde_json::to_value(Icon::for_file("~/Desktop")).unwrap(),
+            json!({"type": "fileicon", "path": "~/Desktop"})
+        );
+        assert_eq!(
+            serde_json::to_value(Icon::for_filetype("com.apple.rtfd")).unwrap(),
+            json!({"type": "filetype", "path": "com.apple.rtfd"})
+        );
+    }
+
+    #[test]
+    fn test_icon_round_trips_through_json() {
+        let icon = Icon::for_file("~/Desktop").resize(IconResize::Centre);
+        let json = serde_json::to_string(&icon).unwrap();
+        assert_eq!(serde_json::from_str::<Icon>(&json).unwrap(), icon);
+
+        // JSON written before `resize` existed still parses.
+        let old: Icon = serde_json::from_str(r#"{"path":"./icon.png"}"#).unwrap();
+        assert_eq!(old, Icon::from_image("./icon.png"));
+    }
+
+    #[test]
+    fn test_icon_resize_values() {
+        for (mode, expected) in [
+            (IconResize::Fit, "fit"),
+            (IconResize::Fill, "fill"),
+            (IconResize::Stretch, "stretch"),
+            (IconResize::Centre, "centre"),
+        ] {
+            let icon = Icon::from_image("./icon.png").resize(mode);
+            assert_eq!(
+                serde_json::to_value(icon).unwrap(),
+                json!({"path": "./icon.png", "resize": expected})
+            );
         }
     }
 }

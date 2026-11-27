@@ -18,6 +18,8 @@ A Rust library for building [Alfred](https://www.alfredapp.com/) workflows. It h
 - Access to workflow directories and configuration
 - Structured logging
 - URL items with clipboard modifiers
+- Typed output for the Script Filter, Grid View, Text View and Run Script / JSON Utility
+- Alfred 6 Script Filter keys (`strictmods`, `iconresize`, icon `resize`)
 - Testing utilities
 
 ## Installation
@@ -26,7 +28,7 @@ Add alfrusco to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-alfrusco = "0.3"
+alfrusco = "0.4"
 
 # For async workflows
 tokio = { version = "1", features = ["full"] }
@@ -282,6 +284,104 @@ Modifier keys:
 - Alt+Shift: Copy as rich text with short title
 - Cmd+Ctrl: Copy as Markdown with long title
 - Alt+Ctrl: Copy as rich text with long title
+
+### File Results and Universal Actions
+
+Mark an item's `arg` as a file path so Universal Actions, the File Buffer and
+Quick Look work on it, and choose exactly what Universal Actions receive:
+
+```rust
+use alfrusco::{Icon, Item, ItemType, UniversalAction};
+
+let item = Item::new("Desktop")
+    .arg("~/Desktop")
+    .item_type(ItemType::File) // or ItemType::FileSkipCheck
+    .icon(Icon::for_file("~/Desktop"))
+    .universal_action(
+        UniversalAction::new()
+            .file("~/Desktop")
+            .url("https://www.alfredapp.com")
+            .text(["one", "two"]),
+    );
+
+// Or let Alfred infer each value's type:
+let item = Item::new("Alfred").action(["https://www.alfredapp.com", "Alfred"]);
+```
+
+### Session Variables
+
+Session variables pass to the rest of the workflow stream and come back into
+the script when it reruns in the same session, which makes them a way to keep
+state between reruns. An item variable of the same name overrides it when that
+item is actioned.
+
+```rust
+workflow.var("page", "2");
+```
+
+### Alfred 6 Keys
+
+Alfred 6 added `strictmods`, `iconresize` and a per-icon `resize` to the Script
+Filter JSON. Use `workflow.config.alfred_major_version()` to check which
+version is running before relying on these features.
+
+```rust
+use alfrusco::{Icon, IconResize, Item};
+
+// Undefined modifier combinations act as `valid: false` instead of running
+// the default action.
+workflow.strict_mods(true);
+
+// How every result's icon fills its space (fit, fill, stretch or centre)...
+workflow.icon_resize(IconResize::Fit);
+
+// ...and a per-icon override.
+let item = Item::new("Photo").icon(Icon::from_image("./photo.png").resize(IconResize::Fill));
+```
+
+### Grid View
+
+The Grid View reads the same JSON as a Script Filter. Use `preselect` to open
+it with an item highlighted:
+
+```rust
+workflow.preselect("desktopfolder"); // the item's uid
+```
+
+### Text View
+
+Write `TextView` from a script that populates Alfred's Text View:
+
+```rust
+use std::time::Duration;
+use alfrusco::{ScrollMode, TextView, TextViewMode};
+
+let mut view = TextView::new("**Status:** syncing…");
+view.footer("Last sync 2 minutes ago")
+    .mode(TextViewMode::Append)
+    .scroll(ScrollMode::End)
+    .rerun(Duration::from_secs(1))
+    .var("cursor", "42");
+view.write(std::io::stdout())?;
+```
+
+### Run Script Output
+
+A Run Script action can write `alfredworkflow` JSON to set the next object's
+argument, override its configuration and set variables (the same format as the
+JSON Utility). Alfred clears the argument when `arg` is left out, so set it
+whenever the next object needs one:
+
+```rust
+use alfrusco::JsonConfig;
+
+let mut output = JsonConfig::new();
+output
+    .arg("https://www.alfredapp.com")
+    .config("browser", "com.apple.Safari")
+    .var("fruit", "banana");
+output.write(std::io::stdout())?;
+```
 
 ### Filtering and Sorting
 
@@ -596,7 +696,9 @@ cargo run --example static_output
 - `arg(value)` / `args(values)` - Set arguments
 - `valid(bool)` - Set actionable
 - `uid(id)` - Set unique identifier
-- `icon_from_image(path)` / `icon_for_filetype(type)` - Set icons
+- `icon(icon)` / `icon_from_image(path)` / `icon_for_file(path)` / `icon_for_filetype(type)` - Set icons
+- `item_type(ItemType)` - Treat `arg` as a file path (`File`, `FileSkipCheck`)
+- `action(values)` / `universal_action(UniversalAction)` - Set Universal Action content
 - `copy_text(text)` / `large_type_text(text)` - Set text operations
 - `quicklook_url(url)` - Enable Quick Look
 - `var(key, value)` - Set workflow variables
@@ -620,6 +722,9 @@ cargo run --example static_output
 - `append_item(item)` / `append_items(items)` - Add items
 - `prepend_item(item)` / `prepend_items(items)` - Add items to beginning
 - `set_filter_keyword(query)` - Enable filtering
+- `var(key, value)` - Set a session variable
+- `preselect(uid)` - Grid View: highlight an item on open
+- `strict_mods(bool)` / `icon_resize(IconResize)` - Alfred 6 keys
 - `data_dir()` / `cache_dir()` - Get directories
 - `run_in_background(name, max_age, command)` - Run background job
 
@@ -628,6 +733,25 @@ cargo run --example static_output
 - `cache(duration, loose_reload)` - Set caching
 - `rerun(interval)` - Set refresh interval
 - `skip_knowledge(bool)` - Control knowledge integration
+- `var(key, value)` / `unset_var(key)` - Session variables
+- `preselect(uid)` - Grid View preselection
+- `strict_mods(bool)` - Alfred 6: undefined modifiers act as `valid: false`
+- `icon_resize(IconResize)` - Alfred 6: icon resizing for every result
+
+### `Icon`
+
+- `from_image(path)` / `for_file(path)` / `for_filetype(uti)` - Constructors
+- `resize(IconResize)` - Alfred 6: per-icon resizing (`Fit`, `Fill`, `Stretch`, `Centre`)
+
+### `TextView`
+
+- `new(response)` / `response(text)` / `footer(text)` - Content
+- `mode(TextViewMode)` / `scroll(ScrollMode)` / `input_field(InputFieldMode)` - Rerun behaviour
+- `action_output(bool)` / `rerun(interval)` / `var(key, value)` / `write(writer)`
+
+### `JsonConfig`
+
+- `arg(value)` / `config(key, value)` / `var(key, value)` / `write(writer)` - Run Script / JSON Utility output
 
 ### Traits
 

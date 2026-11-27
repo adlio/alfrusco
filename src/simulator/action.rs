@@ -129,6 +129,9 @@ pub(crate) struct ItemContext<'a> {
     pub arg: Option<&'a str>,
     /// The item's variables (used when a condition references `{var:name}`).
     pub variables: Option<&'a serde_json::Value>,
+    /// The response's session variables. A condition on `{var:name}` falls
+    /// back to these when the item doesn't set `name` itself.
+    pub session_variables: Option<&'a serde_json::Value>,
 }
 
 /// Walks the graph from a source Script Filter to determine the action outcome.
@@ -153,6 +156,7 @@ pub(crate) fn resolve_action(
                 text: text.to_string(),
             };
         }
+        return ActionResult::DeadEnd;
     }
 
     // Walk graph from source following modifier-matched connections
@@ -399,7 +403,8 @@ fn evaluate_conditions<'a>(
 /// Resolves a condition's `inputstring` to an actual value from the item context.
 ///
 /// - `{query}` → item's arg
-/// - `{var:name}` → item's variable named `name`
+/// - `{var:name}` → the item's variable named `name`, or else the response's
+///   session variable of that name (an item variable overrides a session one)
 /// - Anything else → literal string (uncommon but possible)
 fn resolve_input_string(input_string: &str, item_context: &ItemContext<'_>) -> String {
     if input_string == "{query}" {
@@ -409,7 +414,10 @@ fn resolve_input_string(input_string: &str, item_context: &ItemContext<'_>) -> S
         .strip_prefix("{var:")
         .and_then(|s| s.strip_suffix('}'))
     {
-        if let Some(vars) = item_context.variables {
+        for vars in [item_context.variables, item_context.session_variables]
+            .into_iter()
+            .flatten()
+        {
             if let Some(val) = vars.get(var_name).and_then(|v| v.as_str()) {
                 return val.to_string();
             }
@@ -418,4 +426,37 @@ fn resolve_input_string(input_string: &str, item_context: &ItemContext<'_>) -> S
     }
     // Literal string (pass through)
     input_string.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn test_var_condition_reads_item_then_session_variables() {
+        let item = json!({"mode": "item", "only_item": "a"});
+        let session = json!({"mode": "session", "only_session": "b"});
+        let context = ItemContext {
+            arg: Some("the arg"),
+            variables: Some(&item),
+            session_variables: Some(&session),
+        };
+
+        assert_eq!(resolve_input_string("{query}", &context), "the arg");
+        // An item variable overrides a session variable of the same name.
+        assert_eq!(resolve_input_string("{var:mode}", &context), "item");
+        assert_eq!(resolve_input_string("{var:only_item}", &context), "a");
+        assert_eq!(resolve_input_string("{var:only_session}", &context), "b");
+        assert_eq!(resolve_input_string("{var:missing}", &context), "");
+        assert_eq!(resolve_input_string("literal", &context), "literal");
+    }
+
+    #[test]
+    fn test_var_condition_without_variables_is_empty() {
+        let context = ItemContext::default();
+        assert_eq!(resolve_input_string("{var:mode}", &context), "");
+        assert_eq!(resolve_input_string("{query}", &context), "");
+    }
 }
