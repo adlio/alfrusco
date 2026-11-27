@@ -24,6 +24,46 @@
 //! );
 //! ```
 //!
+//! # A complete window
+//!
+//! The example from the README:
+//!
+//! <!-- README example -->
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # let scratch = tempfile::tempdir()?;
+//! # std::env::set_current_dir(scratch.path())?;
+//! use alfrusco::ui::*;
+//!
+//! let search = TextField::new()
+//!     .id("query")
+//!     .placeholder("Search fruit")
+//!     .focus(true)
+//!     .region(Region::Top)
+//!     .on(Trigger::Changed, Action::function("fruit", function::FILTER_DATA))
+//!     .on(
+//!         Trigger::Actioned,
+//!         JsonAction::new().finish(Finish::new().args(Placeholder::value("fruit", "selected.name.text"))),
+//!     );
+//!
+//! let fruit = DataView::new(
+//!     Cell::new(Label::empty().id("name"))
+//!         .height(28)
+//!         .selected("name", "colour", Colour::alfred_selected_result_text()),
+//!     Data::rows(["Apple", "Banana", "Cherry"].map(|name| Row::new().value("name", "text", name)))
+//!         .filter(Filter::new("name.text", Placeholder::value("query", "text"))),
+//! )
+//! .id("fruit")
+//! .region(Region::Centre);
+//!
+//! let ui = Ui::new(Window::new(View::border().spacing(8).child(search).child(fruit)).padding(8));
+//! std::fs::create_dir_all("fruit.alfredui")?;
+//! ui.write_pretty(std::fs::File::create("fruit.alfredui/ui.json")?)?;
+//! # assert!(std::path::Path::new("fruit.alfredui/ui.json").is_file());
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Keeping up with Alfred
 //!
 //! Alfred UI is new and its property names still change between builds.
@@ -107,28 +147,18 @@ pub type Properties = Map<String, Value>;
 ///
 /// See <https://www.alfredapp.com/help/alfredui/ui-json/>
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ui {
-    #[serde(skip_serializing_if = "Option::is_none")]
     bundleid: Option<String>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     variablesconfig: BTreeMap<String, VariableConfig>,
-    #[serde(skip_serializing_if = "Map::is_empty")]
     variables: Map<String, Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     iconpath: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     log: Option<Log>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     debug: Option<DebugSettings>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     templates: BTreeMap<String, Component>,
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     colours: BTreeMap<String, Colour>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pulse: Option<Pulse>,
     window: Window,
-    #[serde(flatten)]
     extra: Map<String, Value>,
 }
 
@@ -151,6 +181,11 @@ impl Ui {
     }
 
     /// The UI's bundle id. Required for persisted variables.
+    ///
+    /// Alfred 6.0.3 keeps persisted variables in
+    /// `~/Library/Application Support/Alfred/AlfredUI/Persist/<bundleid>/`, so
+    /// two installs with the same bundle id (a development and a release
+    /// build, say) share them.
     pub fn bundle_id(mut self, bundle_id: impl Into<String>) -> Self {
         self.bundleid = Some(bundle_id.into());
         self
@@ -163,6 +198,9 @@ impl Ui {
     }
 
     /// Sets a variable's value at start-up, readable as `{var:name}`.
+    ///
+    /// Not in a script's environment: pass it with `{var:name}` in args, or
+    /// declare it with [`Ui::variable_config`].
     pub fn variable(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.variables.insert(name.into(), value.into());
         self
@@ -217,12 +255,45 @@ impl Ui {
     extra_methods!();
 }
 
+impl Serialize for Ui {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        use serde::ser::Error as _;
+        let mut object = property::ObjectBuilder::new();
+        (|| {
+            object
+                .some("bundleid", self.bundleid.as_ref())?
+                .nonempty("variablesconfig", &self.variablesconfig)?
+                .nonempty("variables", &self.variables)?
+                .some("iconpath", self.iconpath.as_ref())?
+                .some("log", self.log.as_ref())?
+                .some("debug", self.debug.as_ref())?
+                .nonempty("templates", &self.templates)?
+                .nonempty("colours", &self.colours)?
+                .some("pulse", self.pulse.as_ref())?
+                .always("window", &self.window)?;
+            Ok::<_, serde_json::Error>(())
+        })()
+        .map_err(S::Error::custom)?;
+        object.finish(&self.extra, serializer)
+    }
+}
+
 /// A placeholder that Alfred replaces when it reads the JSON or runs an
 /// action.
 ///
-/// `var`, `constant`, `file`, `file_raw` and `param` are replaced when the
-/// JSON loads. `value` and `data` are replaced when an action runs, and only
-/// in action `args` and `variables`.
+/// Alfred preprocesses the JSON when it loads, replacing `var`, `constant`,
+/// `file`, `file_raw` and `param` everywhere except under `bundleid`,
+/// `variablesconfig`, `variables`, `args`, an action's `src`, and a
+/// dataview's `data.filter`. Those keys are resolved each time they're used,
+/// and they are the only places `value` and `data` work; `{var:}` there reads
+/// the variable's current value.
+///
+/// In Alfred 6.0.3 (observed), a missing variable or component becomes an
+/// empty string with a warning in the UI log, while an unknown property of an
+/// existing component stays as the literal placeholder text.
 ///
 /// ```
 /// use alfrusco::ui::Placeholder;

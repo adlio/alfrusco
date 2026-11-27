@@ -21,7 +21,7 @@ use crate::Arg;
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct VariableConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
-    default: Option<String>,
+    default: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     persist: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -33,15 +33,19 @@ pub struct VariableConfig {
 }
 
 impl VariableConfig {
-    /// Alfred's defaults: no default value, not persisted, not passed to
-    /// scripts.
+    /// Alfred's defaults: no default value, not persisted, and `scriptenv`
+    /// off.
     pub fn new() -> Self {
         Self::default()
     }
 
     /// The value used when the variable is null, and the baseline persistence
     /// compares against.
-    pub fn default_value(mut self, value: impl Into<String>) -> Self {
+    ///
+    /// Alfred's docs list `default` as a string, but Alfred 6.0.3 also accepts
+    /// numbers, booleans and objects, keeps their type, and persists numbers
+    /// as numbers (observed).
+    pub fn default_value(mut self, value: impl Into<Value>) -> Self {
         self.default = Some(value.into());
         self
     }
@@ -53,7 +57,13 @@ impl VariableConfig {
         self
     }
 
-    /// Passes the variable to the environment of action scripts and the pulse.
+    /// Alfred's docs say this passes the variable to the environment of action
+    /// scripts and the pulse.
+    ///
+    /// In Alfred 6.0.3 every `variablesconfig` key reaches the script
+    /// environment whatever this says (observed with `scriptenv: false`), so
+    /// don't rely on it either way. Variables not declared in
+    /// `variablesconfig` never reach the environment.
     pub fn script_env(mut self, script_env: bool) -> Self {
         self.scriptenv = Some(script_env);
         self
@@ -140,7 +150,9 @@ impl Pulse {
         Self::change().interval(0.0)
     }
 
-    /// Script arguments: plain strings or `{var:}` placeholders, not UI values.
+    /// Script arguments: plain strings or whole-string `{var:name}`
+    /// placeholders, which Alfred resolves again on every tick. UI values
+    /// (`{value:}`) and composite strings such as `"x-{var:a}"` can't be used.
     pub fn args(mut self, args: impl Into<Arg>) -> Self {
         self.args = Some(args.into());
         self
@@ -209,7 +221,8 @@ impl Log {
         }
     }
 
-    /// The log file. A relative path goes in Alfred UI's shared logs folder.
+    /// The log file. Use an absolute path: that is what was observed writing
+    /// a file in Alfred 6.0.3. Without a path, nothing reached disk.
     pub fn path(mut self, path: impl Into<String>) -> Self {
         self.path = Some(path.into());
         self

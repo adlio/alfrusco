@@ -298,6 +298,12 @@ impl Data {
     extra_methods!();
 }
 
+impl From<Data> for Value {
+    fn from(data: Data) -> Self {
+        serde_json::to_value(data).unwrap_or(Value::Null)
+    }
+}
+
 /// Alfred's `basic` word-match filter.
 ///
 /// See <https://www.alfredapp.com/help/alfredui/components/dataview/filters/basic/>

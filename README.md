@@ -416,13 +416,15 @@ let fruit = DataView::new(
 .region(Region::Centre);
 
 let ui = Ui::new(Window::new(View::border().spacing(8).child(search).child(fruit)).padding(8));
+std::fs::create_dir_all("fruit.alfredui")?;
 ui.write_pretty(std::fs::File::create("fruit.alfredui/ui.json")?)?;
 ```
 
 The model only serializes; it doesn't run the UI or answer its events. Alfred
 UI still renames properties between builds, so every struct has a
-`set(key, value)` escape hatch that writes any key as is, and
-`Component::raw(json)` accepts a component this crate doesn't model yet.
+`set(key, value)` escape hatch that writes any key as is (replacing the typed
+property of the same name), and `Component::raw(json)` accepts a component this
+crate doesn't model yet.
 
 ### Filtering and Sorting
 

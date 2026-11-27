@@ -3,7 +3,7 @@
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use super::property::one_or_many;
+use super::property::{arg_to_value, one_or_many, push_arg};
 use super::JsonAction;
 use crate::Arg;
 
@@ -177,7 +177,7 @@ pub struct Action {
     #[serde(skip_serializing_if = "Option::is_none")]
     src: Option<ActionSrc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    args: Option<Arg>,
+    args: Option<Value>,
     #[serde(skip_serializing_if = "Map::is_empty")]
     variables: Map<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -251,33 +251,34 @@ impl Action {
     }
 
     /// Replaces the arguments: script arguments, function names, or the text a
-    /// log action writes.
+    /// log action writes. A single string is one argument.
     pub fn args(mut self, args: impl Into<Arg>) -> Self {
-        self.args = Some(args.into());
+        self.args = Some(arg_to_value(args.into()));
         self
     }
 
-    /// Adds one argument after any already set.
-    pub fn arg(mut self, arg: impl Into<String>) -> Self {
-        let arg = arg.into();
-        self.args = Some(match self.args.take() {
-            None => Arg::Many(vec![arg]),
-            Some(Arg::One(first)) => Arg::Many(vec![first, arg]),
-            Some(Arg::Many(mut args)) => {
-                args.push(arg);
-                Arg::Many(args)
-            }
-        });
+    /// Adds one argument after any already set. It may be any JSON value:
+    /// Alfred passes booleans as `1` / `0`, numbers in decimal, `null` as an
+    /// empty string and objects and arrays as compact JSON (observed in
+    /// Alfred 6.0.3). With [`Action::flatten_array_args`], arrays become
+    /// separate arguments instead.
+    pub fn arg(mut self, arg: impl Into<Value>) -> Self {
+        push_arg(&mut self.args, arg.into());
         self
     }
 
-    /// Sets a variable before the action runs.
+    /// Sets a variable before the action runs. Values may use `{value:}`
+    /// placeholders, resolved when the action runs.
+    ///
+    /// Not in a script's environment: pass it with `{var:name}` in args, or
+    /// declare it with [`Ui::variable_config`](super::Ui::variable_config).
     pub fn variable(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.variables.insert(name.into(), value.into());
         self
     }
 
-    /// When true, arrays among the args are flattened into one list.
+    /// When true, arrays among the args, including `{var:}` values that hold
+    /// arrays, are flattened recursively into separate arguments.
     pub fn flatten_array_args(mut self, flatten: bool) -> Self {
         self.flattenarrayargs = Some(flatten);
         self

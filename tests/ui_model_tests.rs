@@ -589,7 +589,7 @@ fn dataview_row_edits() {
             .match_empty(false)
             .set("fuzzy", true),
     );
-    let update = Update::new().property("list", "data", to_json(data));
+    let update = Update::new().data("list", data);
     assert_eq!(
         to_json(update)["ids"]["list"]["data"],
         json!({
@@ -775,8 +775,8 @@ fn json_action_ui_commands() {
 fn json_action_system_commands() {
     let actions = JsonAction::new()
         .share(Share::urls("https://example.com").set("subject", "Look"))
-        .sound_with(Sound::new("Ping").set("volume", 0.5))
-        .speak_with(Speak::new("Done").set("voice", "Samantha"))
+        .sound(Sound::new("Ping").set("volume", 0.5))
+        .speak(Speak::new("Done").set("voice", "Samantha"))
         .copy(ClipboardCopy::files(["~/a.txt", "~/b.txt"]).set("transient", true))
         .open(Open::new(SourceType::Url, "https://example.com").set("background", true))
         .open_dialog(
@@ -1023,5 +1023,117 @@ fn placeholders() {
     assert_eq!(
         to_json(Action::log(Placeholder::value("field", "text"))),
         json!({ "type": "log", "args": "{value:field.text}" })
+    );
+}
+
+#[test]
+fn typed_args_and_defaults() {
+    let action = Action::script("scripts/run.sh")
+        .arg("save")
+        .arg(true)
+        .arg(3)
+        .arg(3.5)
+        .arg(Value::Null)
+        .arg(json!({ "o": 1 }))
+        .arg(json!([1, [2, 3]]))
+        .arg(Placeholder::var("ids"))
+        .flatten_array_args(true);
+    assert_eq!(
+        to_json(action),
+        json!({
+            "type": "script",
+            "src": "scripts/run.sh",
+            "args": ["save", true, 3, 3.5, null, { "o": 1 }, [1, [2, 3]], "{var:ids}"],
+            "flattenarrayargs": true
+        })
+    );
+    assert_eq!(
+        to_json(Action::script("a.sh").args(["x", "y"]).arg(1)),
+        json!({ "type": "script", "src": "a.sh", "args": ["x", "y", 1] })
+    );
+    assert_eq!(
+        to_json(Finish::new().arg("task").arg(42).args("only")),
+        json!({ "args": "only" })
+    );
+    assert_eq!(
+        to_json(Finish::new().args("first").arg(2)),
+        json!({ "args": ["first", 2] })
+    );
+
+    let defaults = [
+        (
+            VariableConfig::new().default_value(0),
+            json!({ "default": 0 }),
+        ),
+        (
+            VariableConfig::new().default_value(true),
+            json!({ "default": true }),
+        ),
+        (
+            VariableConfig::new().default_value(json!({ "k": [1, 2] })),
+            json!({ "default": { "k": [1, 2] } }),
+        ),
+        (
+            VariableConfig::new().default_value("light"),
+            json!({ "default": "light" }),
+        ),
+    ];
+    for (config, expected) in defaults {
+        assert_eq!(to_json(config), expected);
+    }
+}
+
+#[test]
+fn set_replaces_the_typed_value() {
+    let ui = Ui::new(Window::new(
+        View::stack()
+            .child(Label::new("typed").set("text", "from set"))
+            .child(DataView::new(
+                Cell::new(Label::empty().id("name")),
+                Data::rows([])
+                    .set("type", "sqlite")
+                    .filter(Filter::new("name.text", "{value:q.text}").set("type", "fuzzy")),
+            ))
+            .child(Button::new("Go").set("type", "glassbutton")),
+    ))
+    .bundle_id("com.example.typed")
+    .set("bundleid", "com.example.set");
+
+    let compact = serde_json::to_string(&ui).unwrap();
+    assert_eq!(compact.matches("\"bundleid\"").count(), 1);
+    assert!(!compact.contains("typed"), "{compact}");
+    let json: Value = serde_json::from_str(&compact).unwrap();
+    assert_eq!(json["bundleid"], "com.example.set");
+    let components = &json["window"]["root"]["components"];
+    assert_eq!(components[0]["text"], "from set");
+    assert_eq!(components[1]["data"]["type"], "sqlite");
+    assert_eq!(components[1]["data"]["filter"]["type"], "fuzzy");
+    assert_eq!(components[2]["type"], "glassbutton");
+
+    let actions = JsonAction::new()
+        .sound("Glass")
+        .set("sound", json!({ "src": "Ping" }));
+    let compact = serde_json::to_string(&actions).unwrap();
+    assert_eq!(compact, r#"{"sound":{"src":"Ping"}}"#);
+}
+
+#[test]
+fn sound_speak_and_data_conversions() {
+    let name = String::from("Hero");
+    assert_eq!(
+        to_json(
+            JsonAction::new()
+                .sound(name.clone())
+                .speak(Placeholder::var("words"))
+        ),
+        json!({ "sound": { "src": "Hero" }, "speak": { "text": "{var:words}" } })
+    );
+    assert_eq!(
+        to_json(JsonAction::new().sound(Placeholder::param("s")).speak(name)),
+        json!({ "sound": { "src": "{param:s}" }, "speak": { "text": "Hero" } })
+    );
+    assert_eq!(
+        Value::from(Data::rows([Row::new().uid("a")])),
+        json!({ "type": "basic", "src": [{ "uid": "a" }] })
     );
 }

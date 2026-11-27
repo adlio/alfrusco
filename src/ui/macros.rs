@@ -8,9 +8,12 @@ macro_rules! extra_methods {
         ///
         /// Use it for a property Alfred added or renamed after this version of
         /// alfrusco, or to send a value the typed setter can't express, such as
-        /// a placeholder string for a non-string property. Keys set here are
-        /// written after the typed properties, so don't also set the same key
-        /// with its typed setter.
+        /// a placeholder string for a non-string property or a different
+        /// `type`. A key set here replaces the typed property of the same name
+        /// in the JSON built by [`Ui`](crate::ui::Ui),
+        /// [`JsonAction`](crate::ui::JsonAction) and `serde_json::to_value`.
+        /// Serializing a single component straight to text, as
+        /// `serde_json::to_string` does, writes both keys.
         pub fn set(mut self, key: impl Into<String>, value: impl Into<serde_json::Value>) -> Self {
             self.extra.insert(key.into(), value.into());
             self

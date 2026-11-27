@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
 use serde_json::{Map, Value};
 
-use super::property::one_or_many;
+use super::property::{arg_to_value, one_or_many, push_arg, ObjectBuilder};
 use super::{Action, Component, MenuItem, Properties, Pulse};
 use crate::Arg;
 
@@ -29,45 +29,26 @@ use crate::Arg;
 ///
 /// See <https://www.alfredapp.com/help/alfredui/actions/json/>
 #[non_exhaustive]
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct JsonAction {
-    #[serde(skip_serializing_if = "Map::is_empty")]
     variables: Map<String, Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pulse: Option<Pulse>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     remove: Option<Remove>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     insert: Option<Insert>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     update: Option<Update>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     replace: Option<Replace>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     sheet: Option<Sheet>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     share: Option<Share>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     sound: Option<Sound>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     speak: Option<Speak>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     copy: Option<ClipboardCopy>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     open: Option<Open>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     opendialog: Option<OpenDialog>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     window: Option<WindowCommand>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     notification: Option<Notification>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     functions: Option<Functions>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     popupmenu: Option<PopupMenu>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     finish: Option<Finish>,
-    #[serde(flatten)]
     extra: Map<String, Value>,
 }
 
@@ -79,6 +60,9 @@ impl JsonAction {
 
     /// Sets a variable. Put `{value:id.property}` placeholders here to use a
     /// component's value in the commands, as `{var:name}`.
+    ///
+    /// Not in a script's environment: pass it with `{var:name}` in args, or
+    /// declare it with [`Ui::variable_config`](super::Ui::variable_config).
     pub fn variable(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
         self.variables.insert(name.into(), value.into());
         self
@@ -126,27 +110,16 @@ impl JsonAction {
         self
     }
 
-    /// Plays a system sound by name, such as `"Glass"`, or a sound file.
-    pub fn sound(mut self, src: impl Into<String>) -> Self {
-        self.sound = Some(Sound::new(src));
+    /// Plays a sound: a system sound name such as `"Glass"`, a sound file, or
+    /// a [`Sound`].
+    pub fn sound(mut self, sound: impl Into<Sound>) -> Self {
+        self.sound = Some(sound.into());
         self
     }
 
-    /// Plays a sound, with access to [`Sound`]'s escape hatch.
-    pub fn sound_with(mut self, sound: Sound) -> Self {
-        self.sound = Some(sound);
-        self
-    }
-
-    /// Speaks `text` aloud.
-    pub fn speak(mut self, text: impl Into<String>) -> Self {
-        self.speak = Some(Speak::new(text));
-        self
-    }
-
-    /// Speaks text, with access to [`Speak`]'s escape hatch.
-    pub fn speak_with(mut self, speak: Speak) -> Self {
-        self.speak = Some(speak);
+    /// Speaks text aloud: a string or a [`Speak`].
+    pub fn speak(mut self, speak: impl Into<Speak>) -> Self {
+        self.speak = Some(speak.into());
         self
     }
 
@@ -192,14 +165,45 @@ impl JsonAction {
         self
     }
 
-    /// Finishes the UI: closes it and, inside a workflow, passes args and
-    /// variables to the next connected object.
+    /// Finishes the UI: closes it and, when the UI opened inside Alfred, passes
+    /// args and variables to the next connected object. See [`Finish`].
     pub fn finish(mut self, finish: Finish) -> Self {
         self.finish = Some(finish);
         self
     }
 
     extra_methods!();
+}
+
+impl Serialize for JsonAction {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::Error as _;
+        let mut object = ObjectBuilder::new();
+        (|| {
+            object
+                .nonempty("variables", &self.variables)?
+                .some("pulse", self.pulse.as_ref())?
+                .some("remove", self.remove.as_ref())?
+                .some("insert", self.insert.as_ref())?
+                .some("update", self.update.as_ref())?
+                .some("replace", self.replace.as_ref())?
+                .some("sheet", self.sheet.as_ref())?
+                .some("share", self.share.as_ref())?
+                .some("sound", self.sound.as_ref())?
+                .some("speak", self.speak.as_ref())?
+                .some("copy", self.copy.as_ref())?
+                .some("open", self.open.as_ref())?
+                .some("opendialog", self.opendialog.as_ref())?
+                .some("window", self.window.as_ref())?
+                .some("notification", self.notification.as_ref())?
+                .some("functions", self.functions.as_ref())?
+                .some("popupmenu", self.popupmenu.as_ref())?
+                .some("finish", self.finish.as_ref())?;
+            Ok::<_, serde_json::Error>(())
+        })()
+        .map_err(S::Error::custom)?;
+        object.finish(&self.extra, serializer)
+    }
 }
 
 /// Removes components by id. Alfred then lays out the whole UI again.
@@ -261,6 +265,10 @@ impl Insert {
 
 /// Changes properties of components by id.
 ///
+/// In Alfred 6.0.3 (observed), an `update` that sets a text field's text
+/// doesn't fire its `changed` event, while a `functions` call such as
+/// `selectnext` on a dataview does fire the dataview's `changed` event.
+///
 /// ```
 /// use alfrusco::ui::{Colour, Update};
 ///
@@ -300,6 +308,11 @@ impl Update {
             .or_default()
             .insert(property.into(), value.into());
         self
+    }
+
+    /// Replaces the data of the dataview with id `id`, for example its rows.
+    pub fn data(self, id: impl Into<String>, data: super::Data) -> Self {
+        self.property(id, "data", data)
     }
 
     /// Sets several properties on the component with id `id`.
@@ -493,6 +506,24 @@ impl Sound {
     extra_methods!();
 }
 
+impl From<&str> for Sound {
+    fn from(src: &str) -> Self {
+        Sound::new(src)
+    }
+}
+
+impl From<String> for Sound {
+    fn from(src: String) -> Self {
+        Sound::new(src)
+    }
+}
+
+impl From<super::Placeholder> for Sound {
+    fn from(src: super::Placeholder) -> Self {
+        Sound::new(src)
+    }
+}
+
 /// Speaks text aloud.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -512,6 +543,24 @@ impl Speak {
     }
 
     extra_methods!();
+}
+
+impl From<&str> for Speak {
+    fn from(text: &str) -> Self {
+        Speak::new(text)
+    }
+}
+
+impl From<String> for Speak {
+    fn from(text: String) -> Self {
+        Speak::new(text)
+    }
+}
+
+impl From<super::Placeholder> for Speak {
+    fn from(text: super::Placeholder) -> Self {
+        Speak::new(text)
+    }
 }
 
 /// A macOS Open dialog. The chosen path or paths go into a variable, and the
@@ -795,6 +844,15 @@ impl PopupMenu {
 /// Closes the UI. Inside a workflow, its args and variables go to the next
 /// connected object.
 ///
+/// What Alfred 6.0.3 does (observed):
+///
+/// - Output reaches the next workflow object only when the Alfred UI object
+///   opens inside Alfred (launch mode 0). A UI launched externally just
+///   closes, and nothing downstream runs.
+/// - Object and array variable values are dropped before the next object;
+///   send strings or numbers.
+/// - Actions after `finish` in the same array still run, then the UI quits.
+///
 /// ```
 /// use alfrusco::ui::{Finish, Placeholder};
 ///
@@ -809,7 +867,7 @@ impl PopupMenu {
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Finish {
     #[serde(skip_serializing_if = "Option::is_none")]
-    args: Option<Arg>,
+    args: Option<Value>,
     #[serde(skip_serializing_if = "Map::is_empty")]
     variables: Map<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -824,9 +882,16 @@ impl Finish {
         Self::default()
     }
 
-    /// The arg or args to pass on.
+    /// The arg or args to pass on. Each array element becomes a separate
+    /// argument of the next object.
     pub fn args(mut self, args: impl Into<Arg>) -> Self {
-        self.args = Some(args.into());
+        self.args = Some(arg_to_value(args.into()));
+        self
+    }
+
+    /// Adds one argument after any already set. It may be any JSON value.
+    pub fn arg(mut self, arg: impl Into<Value>) -> Self {
+        push_arg(&mut self.args, arg.into());
         self
     }
 

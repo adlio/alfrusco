@@ -18,6 +18,88 @@ pub(crate) fn one_or_many<T: Serialize, S: Serializer>(
     }
 }
 
+/// Builds a JSON object field by field, then lets `extra` replace any key,
+/// so a value written with `set` wins over the typed one.
+pub(crate) struct ObjectBuilder {
+    map: Map<String, Value>,
+}
+
+impl ObjectBuilder {
+    pub(crate) fn new() -> Self {
+        ObjectBuilder { map: Map::new() }
+    }
+
+    /// Writes `key` when `value` is `Some`.
+    pub(crate) fn some<T: Serialize>(
+        &mut self,
+        key: &str,
+        value: Option<&T>,
+    ) -> Result<&mut Self, serde_json::Error> {
+        if let Some(value) = value {
+            self.map
+                .insert(key.to_string(), serde_json::to_value(value)?);
+        }
+        Ok(self)
+    }
+
+    /// Writes `key` unless the value serializes to an empty object.
+    pub(crate) fn nonempty<T: Serialize>(
+        &mut self,
+        key: &str,
+        value: &T,
+    ) -> Result<&mut Self, serde_json::Error> {
+        let value = serde_json::to_value(value)?;
+        if !value.as_object().is_some_and(Map::is_empty) {
+            self.map.insert(key.to_string(), value);
+        }
+        Ok(self)
+    }
+
+    /// Writes `key` always.
+    pub(crate) fn always<T: Serialize>(
+        &mut self,
+        key: &str,
+        value: &T,
+    ) -> Result<&mut Self, serde_json::Error> {
+        self.map
+            .insert(key.to_string(), serde_json::to_value(value)?);
+        Ok(self)
+    }
+
+    /// Adds the `set` escape hatch's keys, replacing typed keys, and
+    /// serializes the object.
+    pub(crate) fn finish<S: Serializer>(
+        &mut self,
+        extra: &Map<String, Value>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        for (key, value) in extra {
+            self.map.insert(key.clone(), value.clone());
+        }
+        self.map.serialize(serializer)
+    }
+}
+
+/// Converts string args into their JSON form.
+pub(crate) fn arg_to_value(args: crate::Arg) -> Value {
+    match args {
+        crate::Arg::One(one) => Value::String(one),
+        crate::Arg::Many(many) => Value::Array(many.into_iter().map(Value::String).collect()),
+    }
+}
+
+/// Appends one argument, turning a single string arg into an array.
+pub(crate) fn push_arg(args: &mut Option<Value>, arg: Value) {
+    *args = Some(match args.take() {
+        None => Value::Array(vec![arg]),
+        Some(Value::Array(mut items)) => {
+            items.push(arg);
+            Value::Array(items)
+        }
+        Some(first) => Value::Array(vec![first, arg]),
+    });
+}
+
 /// A colour value: hex, `rgb()`, `hsv()`, a macOS system colour name, a
 /// colour constant from [`Ui::colour`](super::Ui::colour), or a pair of colours
 /// for light and dark mode.
